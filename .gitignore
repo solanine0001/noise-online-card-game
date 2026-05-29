@@ -1,0 +1,12 @@
+node_modules/
+npm-debug.log*
+
+.edge-profile/
+.edge-visual*/
+*.log
+*.err
+
+noise-*.png
+
+.env
+.DS_Store

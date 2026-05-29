@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: noise-online-card-game
+    runtime: node
+    plan: free
+    region: singapore
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeployTrigger: commit
