@@ -125,6 +125,7 @@ try {
 
   await pageA.navigate(baseUrl);
   await pageA.waitFor('document.querySelector("#nameInput")');
+  await pageA.waitFor('document.querySelector("#createBtn") && !document.querySelector("#createBtn").disabled');
   await pageA.fill('#nameInput', 'Visual A');
   await pageA.click('#createBtn');
   await pageA.waitFor('document.querySelector("#copyCode")');
@@ -133,6 +134,7 @@ try {
 
   await pageB.navigate(`${baseUrl}?room=${roomCode}`);
   await pageB.waitFor('document.querySelector("#nameInput")');
+  await pageB.waitFor('document.querySelector("#joinBtn") && !document.querySelector("#joinBtn").disabled');
   await pageB.fill('#nameInput', 'Visual B');
   await pageB.click('#joinBtn');
 
@@ -144,14 +146,13 @@ try {
   await pageA.screenshot('noise-game-mobile.png');
 
   await pageA.click('button[data-number="4"]');
-  await delay(120);
-  await assertEnabledAfterPick(pageA, 'A');
-  await pageA.click('#submitNumber');
-  await delay(300);
   await pageB.click('button[data-number="8"]');
   await delay(120);
   await assertEnabledAfterPick(pageB, 'B');
   await pageB.click('#submitNumber');
+  await delay(300);
+  await assertEnabledAfterPick(pageA, 'A');
+  await pageA.click('#submitNumber');
 
   await Promise.all([
     pageA.waitFor('document.querySelector("#submitNoise")'),

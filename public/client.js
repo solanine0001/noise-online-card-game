@@ -62,13 +62,11 @@
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.type === 'snapshot') {
-        state = message.state;
-        storage.setItem(roomKey, state.roomCode);
-        selectedNumber = null;
-        selectedNoiseId = null;
-        selectedNoiseType = null;
-        shiftDirection = 1;
+        applySnapshot(message.state);
         render();
+      } else if (message.type === 'leftRoom') {
+        resetLocalRoom();
+        showToast('退出しました。');
       } else if (message.type === 'error') {
         showToast(message.message);
       } else if (message.type === 'notice') {
@@ -178,7 +176,7 @@
       const url = `${window.location.origin}${window.location.pathname}?room=${state.roomCode}`;
       copyText(url);
     });
-    document.getElementById('leaveRoom').addEventListener('click', resetLocalRoom);
+    document.getElementById('leaveRoom').addEventListener('click', leaveCurrentRoom);
   }
 
   function renderGame() {
@@ -342,6 +340,7 @@
         <section class="hand-panel compact">
           <div class="hand-actions">
             ${actionTemplate()}
+            ${leaveMatchTemplate()}
           </div>
         </section>
       `;
@@ -353,6 +352,7 @@
         ${noiseHandTemplate()}
         <div class="hand-actions">
           ${actionTemplate()}
+          ${leaveMatchTemplate()}
         </div>
       </section>
     `;
@@ -434,6 +434,10 @@
     return '';
   }
 
+  function leaveMatchTemplate() {
+    return '<button class="ghost danger" id="leaveMatch" type="button">退出</button>';
+  }
+
   function bindGameEvents() {
     const copyCode = document.getElementById('copyCode');
     if (copyCode) copyCode.addEventListener('click', () => copyText(state.roomCode));
@@ -487,6 +491,9 @@
 
     const newRoom = document.getElementById('newRoom');
     if (newRoom) newRoom.addEventListener('click', resetLocalRoom);
+
+    const leaveMatch = document.getElementById('leaveMatch');
+    if (leaveMatch) leaveMatch.addEventListener('click', leaveCurrentRoom);
   }
 
   function statusText() {
@@ -510,6 +517,34 @@
     if (state.you.id === playerId) return state.you.name;
     if (state.opponent?.id === playerId) return state.opponent.name;
     return playerId;
+  }
+
+  function applySnapshot(nextState) {
+    state = nextState;
+    storage.setItem(roomKey, state.roomCode);
+
+    if (state.phase !== 'number' || state.choices?.you.numberLocked || state.you.usedNumbers.includes(selectedNumber)) {
+      selectedNumber = null;
+    }
+
+    const selectedCard = state.you.noiseHand?.find((card) => card.id === selectedNoiseId);
+    if (state.phase !== 'noise' || state.choices?.you.noiseLocked || !selectedCard || isNoiseLocked(selectedCard)) {
+      selectedNoiseId = null;
+      selectedNoiseType = null;
+      shiftDirection = 1;
+      return;
+    }
+
+    selectedNoiseType = selectedCard.type;
+  }
+
+  function leaveCurrentRoom() {
+    if (state?.roomCode && socket?.readyState === WebSocket.OPEN) {
+      send({ type: 'leaveRoom' });
+      return;
+    }
+
+    resetLocalRoom();
   }
 
   function isNoiseLocked(card) {
@@ -555,16 +590,17 @@
     return value;
   }
 
-  function resetLocalRoom() {
+  function resetLocalRoom(shouldRender = true) {
     storage.removeItem(roomKey);
     state = null;
     selectedNumber = null;
     selectedNoiseId = null;
     selectedNoiseType = null;
+    shiftDirection = 1;
     const url = new URL(window.location.href);
     url.searchParams.delete('room');
     window.history.replaceState({}, '', url.toString());
-    renderLobby();
+    if (shouldRender) renderLobby();
   }
 
   async function copyText(text) {

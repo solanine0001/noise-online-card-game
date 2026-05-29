@@ -162,6 +162,10 @@ h1 {
   background: transparent;
 }
 
+.ghost.danger {
+  color: var(--red);
+}
+
 .primary:disabled,
 .secondary:disabled,
 .ghost:disabled,
@@ -521,6 +525,13 @@ h1 {
 
 .hand-panel.compact .hand-actions {
   grid-column: 1;
+}
+
+.hand-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
 }
 
 .hand-title {

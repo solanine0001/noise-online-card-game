@@ -306,8 +306,33 @@ function handleMessage(client, message) {
     readyNext(client);
     return;
   }
+  if (type === 'leaveRoom') {
+    leaveRoom(client);
+    return;
+  }
 
   sendError(client, '未対応の操作です。');
+}
+
+function leaveRoom(client) {
+  const room = rooms.get(client.roomCode);
+  const roomCode = client.roomCode;
+  const playerId = client.playerId;
+
+  detachFromCurrentRoom(client, true);
+  sendJson(client.socket, { type: 'leftRoom' });
+
+  if (!room || !roomCode || !playerId) return;
+
+  if (room.mode === 'cpu') {
+    rooms.delete(roomCode);
+    return;
+  }
+
+  const player = room.players[playerId];
+  if (player) {
+    player.sessionId = makeId('left');
+  }
 }
 
 function createRoom(client, message) {
