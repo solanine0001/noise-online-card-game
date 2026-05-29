@@ -5,7 +5,10 @@ import path from 'node:path';
 const root = process.cwd();
 const baseUrl = process.env.NOISE_HTTP_URL || 'http://localhost:3000';
 const edgePath = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe';
-const viewport = { width: 390, height: 844 };
+const viewport = {
+  width: Number(process.env.NOISE_VIEWPORT_WIDTH || 390),
+  height: Number(process.env.NOISE_VIEWPORT_HEIGHT || 844)
+};
 const runId = Date.now();
 
 class CdpPage {
@@ -173,7 +176,9 @@ try {
 
   const metrics = await pageA.eval(`JSON.stringify({
     width: window.innerWidth,
+    height: window.innerHeight,
     scrollWidth: document.documentElement.scrollWidth,
+    scrollHeight: document.documentElement.scrollHeight,
     result: document.querySelector('.result-title')?.textContent || ''
   })`);
 

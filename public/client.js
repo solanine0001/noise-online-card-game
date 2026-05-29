@@ -274,12 +274,12 @@
     const opponentValue = reveal && opponentId ? reveal.finalNumbers[opponentId] : null;
 
     return `
-      <div class="reveal-grid">
-        <div class="slot">
+      <div class="duel-table">
+        <div class="duel-seat opponent-seat">
           <span class="slot-label">${escapeHtml(state.opponent?.name || 'Opponent')}</span>
           <div class="number-stage">${numberCardTemplate(opponentValue, reveal)}</div>
         </div>
-        <div class="slot">
+        <div class="duel-seat you-seat">
           <span class="slot-label">${escapeHtml(state.you.name)}</span>
           <div class="number-stage">${numberCardTemplate(ownValue, reveal || state.choices?.you.numberLocked)}</div>
         </div>
@@ -498,14 +498,14 @@
 
   function statusText() {
     if (!connected) return '再接続中です。操作は接続後に再開されます。';
-    if (state.opponent?.isCpu) return 'CPUとの対戦中です。CPUの選択は伏せられています。';
     if (!state.opponent?.connected) return '相手の再接続を待っています。';
+    const opponentName = state.opponent?.isCpu ? 'CPU' : '相手';
     if (state.phase === 'number') {
-      if (state.choices?.you.numberLocked) return '数字を伏せました。相手を待っています。';
+      if (state.choices?.you.numberLocked) return `数字を伏せました。${opponentName}を待っています。`;
       return '数字カードを選んで伏せて送信します。';
     }
     if (state.phase === 'noise') {
-      if (state.choices?.you.noiseLocked) return 'ノイズを送信しました。相手を待っています。';
+      if (state.choices?.you.noiseLocked) return `ノイズを送信しました。${opponentName}を待っています。`;
       return 'ノイズを1枚使うか、使わないを選びます。';
     }
     if (state.phase === 'reveal') return '結果公開。両者が進むと次のラウンドです。';

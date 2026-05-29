@@ -209,17 +209,17 @@ h1 {
 
 .game {
   display: grid;
-  min-height: calc(100vh - 28px);
-  min-height: calc(100svh - 28px);
+  min-height: calc(100vh - 30px);
+  min-height: calc(100svh - 30px);
   grid-template-rows: auto 1fr auto;
-  gap: 10px;
+  gap: 8px;
 }
 
 .topbar {
   display: grid;
   grid-template-columns: auto 1fr auto auto;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
 .round-pill,
@@ -285,7 +285,7 @@ h1 {
 .table {
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 6px;
 }
 
 .player-band {
@@ -293,9 +293,13 @@ h1 {
   grid-template-columns: 1fr auto;
   gap: 10px;
   align-items: center;
-  padding: 9px 0;
+  padding: 6px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
+}
+
+.player-band.you {
+  display: none;
 }
 
 .player-name {
@@ -327,7 +331,7 @@ h1 {
   border-radius: 4px;
   color: var(--muted);
   background: rgba(255, 250, 241, 0.72);
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 800;
 }
 
@@ -339,20 +343,20 @@ h1 {
 
 .arena {
   display: grid;
-  gap: 10px;
-  padding: 10px 0;
+  gap: 6px;
+  padding: 6px 0;
 }
 
 .rule-card {
   display: grid;
-  min-height: 92px;
+  min-height: 76px;
   align-content: center;
-  gap: 6px;
+  gap: 4px;
   border: 2px solid var(--black);
   border-radius: 8px;
-  padding: 12px;
+  padding: 10px;
   background: #fffdf8;
-  box-shadow: 5px 5px 0 var(--black);
+  box-shadow: 4px 4px 0 var(--black);
   transform-style: preserve-3d;
 }
 
@@ -361,33 +365,22 @@ h1 {
 }
 
 .rule-label {
-  font-size: clamp(2rem, 11vw, 4.8rem);
+  font-size: clamp(1.9rem, 10vw, 4.2rem);
   line-height: 0.86;
   font-weight: 900;
 }
 
 .rule-summary {
   color: var(--muted);
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 700;
 }
 
 .status-line {
-  min-height: 22px;
+  min-height: 20px;
   color: var(--teal);
+  font-size: 0.92rem;
   font-weight: 900;
-}
-
-.reveal-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.slot {
-  display: grid;
-  gap: 7px;
-  min-width: 0;
 }
 
 .slot-label {
@@ -399,9 +392,50 @@ h1 {
   white-space: nowrap;
 }
 
+.duel-table {
+  position: relative;
+  min-height: 194px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  perspective: 760px;
+  overflow: hidden;
+}
+
+.duel-seat {
+  position: absolute;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  transform-style: preserve-3d;
+}
+
+.duel-seat .slot-label {
+  display: none;
+}
+
+.opponent-seat {
+  top: 4px;
+  left: 4px;
+  z-index: 1;
+  width: 43%;
+  transform: translateY(-3px) rotateX(16deg) scale(0.82);
+  transform-origin: top center;
+  opacity: 0.92;
+}
+
+.you-seat {
+  right: 12px;
+  bottom: 6px;
+  z-index: 2;
+  width: 51%;
+  transform: rotateX(-4deg);
+  transform-origin: bottom center;
+}
+
 .number-stage {
   display: grid;
-  min-height: 104px;
+  min-height: 0;
+  aspect-ratio: 1.05;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -411,7 +445,7 @@ h1 {
 .big-number,
 .card-back {
   display: grid;
-  width: min(34vw, 140px);
+  width: min(34vw, 136px);
   aspect-ratio: 0.78;
   place-items: center;
   border: 2px solid var(--black);
@@ -421,6 +455,16 @@ h1 {
   font-size: clamp(2.4rem, 16vw, 5rem);
   font-weight: 900;
   box-shadow: 4px 4px 0 var(--black);
+}
+
+.opponent-seat .big-number,
+.opponent-seat .card-back {
+  width: min(23vw, 92px);
+}
+
+.you-seat .big-number,
+.you-seat .card-back {
+  width: min(31vw, 124px);
 }
 
 .card-back {
@@ -438,11 +482,11 @@ h1 {
 .noise-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 8px;
 }
 
 .noise-reveal {
-  min-height: 42px;
+  min-height: 36px;
   border: 1px solid var(--line);
   border-radius: 8px;
   display: grid;
@@ -509,8 +553,8 @@ h1 {
   position: sticky;
   bottom: max(0px, env(safe-area-inset-bottom));
   display: grid;
-  gap: 10px;
-  padding: 10px;
+  gap: 7px;
+  padding: 8px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 250, 241, 0.96);
@@ -540,19 +584,19 @@ h1 {
   justify-content: space-between;
   gap: 10px;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-weight: 900;
 }
 
 .number-hand {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 7px;
+  gap: 6px;
 }
 
 .card-button {
   display: grid;
-  min-height: 48px;
+  min-height: 42px;
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -578,12 +622,12 @@ h1 {
 .noise-hand {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 7px;
+  gap: 6px;
 }
 
 .noise-button {
   display: grid;
-  min-height: 48px;
+  min-height: 42px;
   place-items: center;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -618,7 +662,7 @@ h1 {
 }
 
 .shift-control button {
-  min-height: 42px;
+  min-height: 38px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
   background: #fffdf8;
@@ -805,6 +849,158 @@ body.modal-open {
   }
 }
 
+@media (max-width: 759px) and (max-height: 740px) {
+  .app {
+    padding: max(8px, env(safe-area-inset-top)) 10px max(8px, env(safe-area-inset-bottom));
+  }
+
+  .game {
+    min-height: calc(100svh - 16px);
+    gap: 5px;
+  }
+
+  .topbar {
+    gap: 6px;
+  }
+
+  .round-pill,
+  .room-pill,
+  .rules-pill {
+    min-height: 34px;
+    padding: 0 8px;
+  }
+
+  .score-name {
+    font-size: 0.66rem;
+  }
+
+  .score-value {
+    font-size: 1.12rem;
+  }
+
+  .table {
+    gap: 4px;
+    min-height: 0;
+  }
+
+  .player-band {
+    gap: 6px;
+    padding: 4px 0;
+  }
+
+  .used-strip {
+    width: min(46vw, 190px);
+  }
+
+  .used-dot {
+    font-size: 0.54rem;
+  }
+
+  .arena {
+    gap: 5px;
+    padding: 4px 0;
+  }
+
+  .rule-card {
+    min-height: 60px;
+    gap: 2px;
+    padding: 7px;
+    box-shadow: 3px 3px 0 var(--black);
+  }
+
+  .rule-label {
+    font-size: clamp(1.5rem, 9vw, 3.2rem);
+  }
+
+  .rule-summary {
+    font-size: 0.72rem;
+  }
+
+  .status-line {
+    min-height: 17px;
+    font-size: 0.82rem;
+  }
+
+  .duel-table {
+    min-height: 140px;
+  }
+
+  .opponent-seat {
+    width: 40%;
+    transform: translateY(-4px) rotateX(17deg) scale(0.78);
+  }
+
+  .you-seat {
+    right: 16px;
+    bottom: 4px;
+    width: 45%;
+  }
+
+  .opponent-seat .big-number,
+  .opponent-seat .card-back {
+    width: min(18vw, 68px);
+  }
+
+  .you-seat .big-number,
+  .you-seat .card-back {
+    width: min(25vw, 94px);
+  }
+
+  .noise-row {
+    gap: 6px;
+  }
+
+  .noise-reveal {
+    min-height: 30px;
+    font-size: 0.72rem;
+  }
+
+  .result-banner {
+    min-height: 52px;
+    padding: 8px 10px;
+  }
+
+  .result-title {
+    font-size: 1rem;
+  }
+
+  .result-detail,
+  .private-note,
+  .log-list {
+    font-size: 0.74rem;
+  }
+
+  .hand-panel {
+    gap: 5px;
+    padding: 6px;
+  }
+
+  .hand-title {
+    font-size: 0.68rem;
+  }
+
+  .number-hand,
+  .noise-hand {
+    gap: 5px;
+  }
+
+  .card-button,
+  .noise-button {
+    min-height: 36px;
+    border-radius: 7px;
+  }
+
+  .noise-button {
+    font-size: 0.7rem;
+  }
+
+  .primary,
+  .secondary,
+  .ghost {
+    min-height: 40px;
+  }
+}
+
 @media (min-width: 760px) {
   .app {
     padding: 24px;
@@ -828,8 +1024,29 @@ body.modal-open {
     grid-column: 1 / -1;
   }
 
+  .player-band.you {
+    display: grid;
+  }
+
   .arena {
     grid-column: 2;
+  }
+
+  .duel-table {
+    min-height: 300px;
+  }
+
+  .duel-seat .slot-label {
+    display: block;
+  }
+
+  .opponent-seat {
+    width: 44%;
+    transform: translateY(-2px) rotateX(14deg) scale(0.86);
+  }
+
+  .you-seat {
+    width: 52%;
   }
 
   .hand-panel {
