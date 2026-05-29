@@ -213,13 +213,14 @@ h1 {
 
 .topbar {
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr auto auto;
   align-items: center;
   gap: 10px;
 }
 
 .round-pill,
-.room-pill {
+.room-pill,
+.rules-pill {
   display: grid;
   min-height: 38px;
   place-items: center;
@@ -230,8 +231,14 @@ h1 {
   font-weight: 900;
 }
 
-.room-pill {
+.room-pill,
+.rules-pill {
   cursor: pointer;
+}
+
+.rules-pill {
+  color: var(--ink);
+  background: var(--yellow);
 }
 
 .scoreboard {
@@ -577,6 +584,12 @@ h1 {
   cursor: pointer;
 }
 
+.noise-button span {
+  color: inherit;
+  font-size: 0.62rem;
+  font-weight: 900;
+}
+
 .noise-button.none {
   border-style: dashed;
 }
@@ -630,6 +643,106 @@ h1 {
 .toast.show {
   transform: translate(-50%, 0);
   opacity: 1;
+}
+
+body.modal-open {
+  overflow: hidden;
+}
+
+.rulebook-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom));
+  background: rgba(22, 25, 29, 0.72);
+}
+
+.rulebook-modal[hidden] {
+  display: none;
+}
+
+.rulebook-shell {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 0;
+  width: min(100%, 860px);
+  margin: 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--paper);
+  box-shadow: var(--shadow);
+}
+
+.rulebook-bar {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255, 250, 241, 0.96);
+}
+
+.rulebook-bar h2 {
+  margin: 0;
+  font-size: 1.28rem;
+}
+
+.rulebook-frame {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--paper);
+}
+
+.rulebook-page {
+  min-height: 100vh;
+  min-height: 100svh;
+}
+
+.rulebook-doc {
+  display: grid;
+  gap: 20px;
+  width: min(100%, 820px);
+  margin: 0 auto;
+  padding: 22px 16px 40px;
+}
+
+.rulebook-doc h1 {
+  font-size: 3.2rem;
+  line-height: 0.92;
+}
+
+.rulebook-doc h2 {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 1.35rem;
+}
+
+.rulebook-doc h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.rulebook-doc section {
+  display: grid;
+  gap: 10px;
+}
+
+.rulebook-doc p,
+.rulebook-doc li {
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.65;
+}
+
+.rulebook-doc ul,
+.rulebook-doc ol {
+  margin: 0;
+  padding-left: 1.35rem;
 }
 
 .hidden {

@@ -3,6 +3,8 @@
 
   const app = document.getElementById('app');
   const toast = document.getElementById('toast');
+  const rulebookModal = document.getElementById('rulebookModal');
+  const rulebookFrame = document.getElementById('rulebookFrame');
   const storage = window.localStorage;
   const sessionKey = 'noise.sessionId';
   const roomKey = 'noise.roomCode';
@@ -19,6 +21,23 @@
   let selectedNoiseType = null;
   let shiftDirection = 1;
   let lastRoundRendered = 0;
+
+  document.addEventListener('click', (event) => {
+    if (event.target.closest('[data-rulebook]')) {
+      openRulebook();
+      return;
+    }
+
+    if (event.target.closest('[data-rulebook-close]')) {
+      closeRulebook();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !rulebookModal.hidden) {
+      closeRulebook();
+    }
+  });
 
   connect();
   render();
@@ -101,6 +120,7 @@
             <input id="roomInput" maxlength="8" autocapitalize="characters" value="${roomValue}" placeholder="ABCDE">
           </label>
           <button class="secondary" id="joinBtn" ${connected ? '' : 'disabled'}>参加</button>
+          <button class="ghost" type="button" data-rulebook>ルールブック</button>
         </div>
       </section>
     `;
@@ -139,6 +159,7 @@
           <p class="eyebrow">ROOM CODE</p>
           <button class="room-code" id="copyCode">${escapeHtml(state.roomCode)}</button>
           <button class="primary" id="shareLink">招待リンクをコピー</button>
+          <button class="ghost" type="button" data-rulebook>ルールブック</button>
           <button class="ghost" id="leaveRoom">ロビーに戻る</button>
         </div>
       </section>
@@ -201,6 +222,7 @@
             <span class="score-value">${opponent.score}</span>
           </div>
         </div>
+        <button class="rules-pill" type="button" data-rulebook>RULE</button>
         <button class="room-pill" id="copyCode">${escapeHtml(state.roomCode)}</button>
       </header>
     `;
@@ -359,7 +381,9 @@
           <button class="noise-button none ${noneSelected ? 'selected' : ''}" data-noise-id="" ${canPick ? '' : 'disabled'}>使わない</button>
           ${hand.map((card) => `
             <button class="noise-button ${selectedNoiseId === card.id ? 'selected' : ''}"
-              data-noise-id="${escapeHtml(card.id)}" data-noise-type="${escapeHtml(card.type)}" ${canPick ? '' : 'disabled'}>${escapeHtml(card.type)}</button>
+              data-noise-id="${escapeHtml(card.id)}" data-noise-type="${escapeHtml(card.type)}" ${canPick && !isNoiseLocked(card) ? '' : 'disabled'}>
+              ${escapeHtml(card.type)}${isNoiseLocked(card) ? '<span>LOCK</span>' : ''}
+            </button>
           `).join('')}
         </div>
         ${shiftControlTemplate(canPick)}
@@ -475,6 +499,23 @@
     if (state.you.id === playerId) return state.you.name;
     if (state.opponent?.id === playerId) return state.opponent.name;
     return playerId;
+  }
+
+  function isNoiseLocked(card) {
+    return Number(card.disabledUntilRound || 0) >= Number(state.round || 0);
+  }
+
+  function openRulebook() {
+    if (!rulebookFrame.getAttribute('src')) {
+      rulebookFrame.setAttribute('src', '/rulebook.html');
+    }
+    rulebookModal.hidden = false;
+    document.body.classList.add('modal-open');
+  }
+
+  function closeRulebook() {
+    rulebookModal.hidden = true;
+    document.body.classList.remove('modal-open');
   }
 
   function send(payload) {

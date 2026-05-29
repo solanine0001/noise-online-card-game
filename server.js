@@ -60,7 +60,7 @@ const NOISES = {
   },
   Peek: {
     label: 'Peek',
-    summary: '相手のノイズ手札を1枚確認'
+    summary: '相手のノイズ手札を1枚確認して一時封印'
   }
 };
 
@@ -444,6 +444,10 @@ function submitNoise(client, message) {
       sendError(client, 'そのノイズカードは手札にありません。');
       return;
     }
+    if (isNoiseCardLocked(card, room.round)) {
+      sendError(client, 'そのノイズカードはPeekにより使用できません。');
+      return;
+    }
 
     const direction = card.type === 'Shift'
       ? normalizeShiftDirection(room.choices[player.id].number, message.direction)
@@ -696,8 +700,13 @@ function resolvePeek(room, playerId, source, privateNotes, logs) {
     return;
   }
 
-  privateNotes[playerId].push(`${source}: 相手の手札に ${visibleCard.type} があります。`);
-  logs.push(`${playerLabel(room, playerId)}の${source}が相手のノイズ手札を1枚確認しました。`);
+  visibleCard.disabledUntilRound = Math.max(visibleCard.disabledUntilRound || 0, room.round + 1);
+  privateNotes[playerId].push(`${source}: 相手の手札に ${visibleCard.type} があります。次のラウンド終了まで使用できません。`);
+  logs.push(`${playerLabel(room, playerId)}の${source}が相手のノイズ手札を1枚確認し、一時封印しました。`);
+}
+
+function isNoiseCardLocked(card, round) {
+  return Number(card.disabledUntilRound || 0) >= round;
 }
 
 function judgeRound(rule, reversed, numbers, previousNumbers) {
