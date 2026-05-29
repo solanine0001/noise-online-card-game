@@ -7,6 +7,7 @@ const path = require('path');
 
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const INDEX_FILE = path.join(PUBLIC_DIR, 'index.html');
 const TOTAL_ROUNDS = 10;
 
 const RULE_COUNTS = {
@@ -103,19 +104,17 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  fs.readFile(filePath, (error, data) => {
-    if (error) {
-      res.writeHead(404);
-      res.end('Not Found');
+  serveFile(filePath, res, () => {
+    const wantsHtml = String(req.headers.accept || '').includes('text/html');
+    const hasExtension = Boolean(path.extname(requestUrl.pathname));
+
+    if (wantsHtml || !hasExtension) {
+      serveFile(INDEX_FILE, res);
       return;
     }
 
-    const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, {
-      'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
-      'Cache-Control': 'no-store'
-    });
-    res.end(data);
+    res.writeHead(404);
+    res.end('Not Found');
   });
 });
 
@@ -170,6 +169,28 @@ process.on('SIGTERM', () => {
     process.exit(0);
   });
 });
+
+function serveFile(filePath, res, onMissing) {
+  fs.readFile(filePath, (error, data) => {
+    if (error) {
+      if (onMissing) {
+        onMissing();
+        return;
+      }
+
+      res.writeHead(404);
+      res.end('Not Found');
+      return;
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    res.writeHead(200, {
+      'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
+      'Cache-Control': 'no-store'
+    });
+    res.end(data);
+  });
+}
 
 function readFrames(client, chunk) {
   client.buffer = Buffer.concat([client.buffer, chunk]);
