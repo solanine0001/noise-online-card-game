@@ -164,12 +164,34 @@ try {
     pageB.waitFor('document.querySelector("#submitNoise")')
   ]);
 
-  await pageA.eval(`
+  const shiftPreview = JSON.parse(await pageA.eval(`JSON.stringify(
     (() => {
-      const firstNoise = document.querySelector('button.noise-button:not(.none)');
-      if (firstNoise) firstNoise.click();
+      const shift = Array.from(document.querySelectorAll('button.noise-button'))
+        .find((button) => button.dataset.noiseType === 'Shift');
+      if (!shift) {
+        const firstNoise = document.querySelector('button.noise-button:not(.none)');
+        if (firstNoise) firstNoise.click();
+        return { hasShift: false };
+      }
+
+      shift.click();
+      const afterDefault = document.querySelector('.you-seat .big-number')?.textContent.trim() || '';
+      document.querySelector('button[data-shift="-1"]')?.click();
+      const afterMinus = document.querySelector('.you-seat .big-number')?.textContent.trim() || '';
+      document.querySelector('button[data-shift="1"]')?.click();
+      const afterPlus = document.querySelector('.you-seat .big-number')?.textContent.trim() || '';
+      return { hasShift: true, afterDefault, afterMinus, afterPlus };
     })()
-  `);
+  )`));
+
+  if (shiftPreview.hasShift && (
+    shiftPreview.afterDefault !== '5'
+    || shiftPreview.afterMinus !== '3'
+    || shiftPreview.afterPlus !== '5'
+  )) {
+    throw new Error(`Shift preview failed: ${JSON.stringify(shiftPreview)}`);
+  }
+
   await pageA.click('#submitNoise');
   await pageB.click('#submitNoise');
   await pageA.waitFor('document.querySelector(".result-banner")');
@@ -181,6 +203,7 @@ try {
     height: window.innerHeight,
     scrollWidth: document.documentElement.scrollWidth,
     scrollHeight: document.documentElement.scrollHeight,
+    shiftPreview: ${JSON.stringify(shiftPreview)},
     result: document.querySelector('.result-title')?.textContent || ''
   })`);
 

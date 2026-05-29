@@ -294,26 +294,27 @@
     const reveal = state.reveal;
     const ownId = state.you.id;
     const opponentId = state.opponent?.id;
-    const ownValue = reveal ? reveal.finalNumbers[ownId] : state.choices?.you.pendingNumber;
+    const ownValue = reveal ? reveal.finalNumbers[ownId] : ownDisplayNumber();
+    const ownPreview = !reveal && isShiftPreviewing();
     const opponentValue = reveal && opponentId ? reveal.finalNumbers[opponentId] : null;
 
     return `
       <div class="duel-table">
         <div class="duel-seat opponent-seat">
-          <span class="slot-label">${escapeHtml(state.opponent?.name || 'Opponent')}</span>
+          <span class="slot-label"><small>奥</small>${escapeHtml(state.opponent?.name || 'Opponent')}</span>
           <div class="number-stage">${numberCardTemplate(opponentValue, reveal)}</div>
         </div>
         <div class="duel-seat you-seat">
-          <span class="slot-label">${escapeHtml(state.you.name)}</span>
-          <div class="number-stage">${numberCardTemplate(ownValue, reveal || state.choices?.you.numberLocked)}</div>
+          <span class="slot-label"><small>手前</small>${escapeHtml(state.you.name)}</span>
+          <div class="number-stage">${numberCardTemplate(ownValue, reveal || state.choices?.you.numberLocked, ownPreview)}</div>
         </div>
       </div>
     `;
   }
 
-  function numberCardTemplate(value, revealed) {
+  function numberCardTemplate(value, revealed, preview = false) {
     if (value === null || value === undefined) return '<div class="card-back">?</div>';
-    return `<div class="big-number ${revealed ? 'revealed' : ''}">${value}</div>`;
+    return `<div class="big-number ${revealed ? 'revealed' : ''} ${preview ? 'shift-preview' : ''}">${value}</div>`;
   }
 
   function resultTemplate() {
@@ -429,10 +430,16 @@
     const pending = state.choices?.you.pendingNumber;
     const disableMinus = pending === 1;
     const disablePlus = pending === maxNumber();
+    const minusValue = shiftedNumber(pending, -1);
+    const plusValue = shiftedNumber(pending, 1);
     return `
       <div class="shift-control">
-        <button data-shift="-1" class="${shiftDirection === -1 ? 'selected' : ''}" ${canPick && !disableMinus ? '' : 'disabled'}>-1</button>
-        <button data-shift="1" class="${shiftDirection === 1 ? 'selected' : ''}" ${canPick && !disablePlus ? '' : 'disabled'}>+1</button>
+        <button data-shift="-1" class="${shiftDirection === -1 ? 'selected' : ''}" ${canPick && !disableMinus ? '' : 'disabled'}>
+          -1<span>${minusValue}</span>
+        </button>
+        <button data-shift="1" class="${shiftDirection === 1 ? 'selected' : ''}" ${canPick && !disablePlus ? '' : 'disabled'}>
+          +1<span>${plusValue}</span>
+        </button>
       </div>
     `;
   }
@@ -540,6 +547,26 @@
 
   function maxNumber() {
     return Number(state?.maxNumber || 7);
+  }
+
+  function isShiftPreviewing() {
+    return state.phase === 'noise'
+      && selectedNoiseType === 'Shift'
+      && !state.choices?.you.noiseLocked
+      && state.choices?.you.pendingNumber !== null
+      && state.choices?.you.pendingNumber !== undefined;
+  }
+
+  function ownDisplayNumber() {
+    const pending = state.choices?.you.pendingNumber;
+    return isShiftPreviewing() ? shiftedNumber(pending, shiftDirection) : pending;
+  }
+
+  function shiftedNumber(number, direction) {
+    if (number === null || number === undefined) return null;
+    if (number === 1) return 2;
+    if (number === maxNumber()) return maxNumber() - 1;
+    return number + (Number(direction) === -1 ? -1 : 1);
   }
 
   function playerName(playerId) {

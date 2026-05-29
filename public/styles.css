@@ -434,58 +434,68 @@ h1 {
 
 .duel-table {
   position: relative;
-  min-height: 194px;
+  display: grid;
+  gap: 6px;
+  min-height: 0;
+  padding: 6px;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  perspective: 760px;
-  overflow: hidden;
+  background: linear-gradient(180deg, rgba(255, 250, 241, 0.38), rgba(255, 250, 241, 0.74));
+  overflow: visible;
 }
 
 .duel-seat {
-  position: absolute;
+  position: relative;
   display: grid;
+  grid-template-columns: 62px minmax(0, 1fr);
+  align-items: center;
   gap: 4px;
   min-width: 0;
-  transform-style: preserve-3d;
 }
 
 .duel-seat .slot-label {
-  display: none;
+  display: grid;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.05;
+}
+
+.duel-seat .slot-label small {
+  color: var(--teal);
+  font-size: 0.58rem;
+  font-weight: 900;
 }
 
 .opponent-seat {
-  top: 4px;
-  left: 4px;
+  min-height: 56px;
   z-index: 1;
-  width: 43%;
-  transform: translateY(-3px) rotateX(16deg) scale(0.82);
-  transform-origin: top center;
   opacity: 0.92;
+  padding: 2px 42px 2px 6px;
 }
 
 .you-seat {
-  right: 12px;
-  bottom: 6px;
+  min-height: 72px;
   z-index: 2;
-  width: 51%;
-  transform: rotateX(-4deg);
-  transform-origin: bottom center;
+  margin-left: 18%;
+  border: 2px solid var(--black);
+  border-radius: 8px;
+  padding: 5px 7px 5px 14px;
+  background: #fffdf8;
+  box-shadow: 3px 3px 0 var(--black);
 }
 
 .number-stage {
   display: grid;
   min-height: 0;
-  aspect-ratio: 1.05;
   place-items: center;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: rgba(255, 250, 241, 0.72);
+  justify-content: end;
 }
 
 .big-number,
 .card-back {
   display: grid;
-  width: min(34vw, 136px);
+  width: 64px;
   aspect-ratio: 0.78;
   place-items: center;
   border: 2px solid var(--black);
@@ -494,17 +504,25 @@ h1 {
   color: var(--ink);
   font-size: clamp(2.4rem, 16vw, 5rem);
   font-weight: 900;
-  box-shadow: 4px 4px 0 var(--black);
+  box-shadow: 2px 2px 0 var(--black);
 }
 
 .opponent-seat .big-number,
 .opponent-seat .card-back {
-  width: min(23vw, 92px);
+  width: 46px;
+  font-size: 1.45rem;
+  box-shadow: 2px 2px 0 var(--black);
 }
 
 .you-seat .big-number,
 .you-seat .card-back {
-  width: min(31vw, 124px);
+  width: 62px;
+}
+
+.big-number.shift-preview {
+  border-color: var(--teal);
+  background: rgba(31, 139, 132, 0.1);
+  color: var(--teal);
 }
 
 .card-back {
@@ -708,6 +726,8 @@ h1 {
 }
 
 .shift-control button {
+  display: grid;
+  gap: 1px;
   min-height: 38px;
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -716,10 +736,20 @@ h1 {
   font-weight: 900;
 }
 
+.shift-control button span {
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 900;
+}
+
 .shift-control button.selected {
   color: #fffdf8;
   border-color: var(--teal);
   background: var(--teal);
+}
+
+.shift-control button.selected span {
+  color: #fffdf8;
 }
 
 .toast {
@@ -968,28 +998,38 @@ body.modal-open {
   }
 
   .duel-table {
-    min-height: 140px;
+    gap: 4px;
+    padding: 5px;
+  }
+
+  .duel-seat {
+    grid-template-columns: 52px minmax(0, 1fr);
+  }
+
+  .duel-seat .slot-label {
+    font-size: 0.64rem;
   }
 
   .opponent-seat {
-    width: 40%;
-    transform: translateY(-4px) rotateX(17deg) scale(0.78);
+    min-height: 46px;
+    padding: 1px 34px 1px 4px;
   }
 
   .you-seat {
-    right: 16px;
-    bottom: 4px;
-    width: 45%;
+    min-height: 60px;
+    margin-left: 15%;
+    padding: 4px 6px 4px 10px;
   }
 
   .opponent-seat .big-number,
   .opponent-seat .card-back {
-    width: min(18vw, 68px);
+    width: 36px;
+    font-size: 1.18rem;
   }
 
   .you-seat .big-number,
   .you-seat .card-back {
-    width: min(25vw, 94px);
+    width: 48px;
   }
 
   .noise-row {
@@ -1079,20 +1119,33 @@ body.modal-open {
   }
 
   .duel-table {
-    min-height: 300px;
+    max-width: 620px;
+    gap: 10px;
+    padding: 10px;
   }
 
   .duel-seat .slot-label {
-    display: block;
+    display: grid;
   }
 
   .opponent-seat {
-    width: 44%;
-    transform: translateY(-2px) rotateX(14deg) scale(0.86);
+    min-height: 72px;
+    padding-right: 96px;
   }
 
   .you-seat {
-    width: 52%;
+    min-height: 96px;
+    margin-left: 22%;
+  }
+
+  .opponent-seat .big-number,
+  .opponent-seat .card-back {
+    width: 62px;
+  }
+
+  .you-seat .big-number,
+  .you-seat .card-back {
+    width: 84px;
   }
 
   .hand-panel {
