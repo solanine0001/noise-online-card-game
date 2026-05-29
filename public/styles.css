@@ -277,6 +277,15 @@ h1 {
   font-weight: 900;
 }
 
+.streak-line {
+  overflow: hidden;
+  color: var(--teal);
+  font-size: 0.55rem;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .score-separator {
   color: var(--line-strong);
   font-weight: 900;
@@ -367,6 +376,7 @@ h1 {
 }
 
 .rule-card {
+  position: relative;
   display: grid;
   min-height: 76px;
   align-content: center;
@@ -377,13 +387,63 @@ h1 {
   background: #fffdf8;
   box-shadow: 4px 4px 0 var(--black);
   transform-style: preserve-3d;
+  overflow: hidden;
 }
 
 .rule-card.flip {
   animation: ruleFlip 520ms ease both;
 }
 
+.rule-card::after {
+  position: absolute;
+  right: 10px;
+  bottom: 5px;
+  z-index: 0;
+  color: rgba(22, 25, 29, 0.08);
+  font-size: 1.9rem;
+  font-weight: 900;
+  letter-spacing: 2px;
+  pointer-events: none;
+}
+
+.rule-card.point-1 {
+  background: #fffdf8;
+}
+
+.rule-card.point-1::after {
+  content: "★";
+}
+
+.rule-card.point-2 {
+  border-color: #126c68;
+  background:
+    linear-gradient(135deg, rgba(31, 139, 132, 0.18), rgba(255, 250, 241, 0.92) 52%),
+    #fffdf8;
+  box-shadow: 4px 4px 0 #126c68;
+}
+
+.rule-card.point-2::after {
+  content: "★★";
+  color: rgba(31, 139, 132, 0.18);
+}
+
+.rule-card.point-3 {
+  border-color: var(--black);
+  background:
+    radial-gradient(circle at 88% 22%, rgba(255, 255, 255, 0.7) 0 9px, transparent 10px),
+    linear-gradient(135deg, #f3ca54, #fff1a8 50%, #fffaf1 100%);
+  box-shadow: 5px 5px 0 var(--black);
+}
+
+.rule-card.point-3::after {
+  content: "★★★";
+  color: rgba(22, 25, 29, 0.16);
+  font-size: 2.25rem;
+}
+
 .rule-heading {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: start;
   justify-content: space-between;
@@ -399,7 +459,7 @@ h1 {
 .point-badge {
   display: grid;
   min-width: 48px;
-  min-height: 30px;
+  min-height: 34px;
   place-items: center;
   border: 2px solid var(--black);
   border-radius: 8px;
@@ -410,7 +470,26 @@ h1 {
   box-shadow: 2px 2px 0 var(--black);
 }
 
+.point-badge small {
+  margin-top: -2px;
+  font-size: 0.46rem;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.point-2 .point-badge {
+  background: var(--teal);
+  color: #fffdf8;
+}
+
+.point-3 .point-badge {
+  background: #fff3a6;
+  box-shadow: 3px 3px 0 var(--black);
+}
+
 .rule-summary {
+  position: relative;
+  z-index: 1;
   color: var(--muted);
   font-size: 0.82rem;
   font-weight: 700;
@@ -640,6 +719,18 @@ h1 {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
+}
+
+.auto-next {
+  display: grid;
+  gap: 4px;
+}
+
+.auto-next span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-align: center;
 }
 
 .hand-title {

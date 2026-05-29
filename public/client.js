@@ -9,6 +9,7 @@
   const sessionKey = 'noise.sessionId';
   const roomKey = 'noise.roomCode';
   const nameKey = 'noise.name';
+  const noiseOrder = ['Reverse', 'Shift', 'Jam', 'Echo', 'Peek'];
   const sessionId = getSessionId();
   const queryRoom = new URLSearchParams(window.location.search).get('room');
 
@@ -21,6 +22,7 @@
   let selectedNoiseType = null;
   let shiftDirection = 1;
   let lastRoundRendered = 0;
+  let countdownTimer = null;
 
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-rulebook]')) {
@@ -84,11 +86,13 @@
 
   function render() {
     if (!state) {
+      clearCountdownTimer();
       renderLobby();
       return;
     }
 
     if (state.status === 'lobby') {
+      clearCountdownTimer();
       renderWaiting();
       return;
     }
@@ -183,6 +187,7 @@
     const isReveal = state.phase === 'reveal' || state.phase === 'ended';
     const rule = isReveal && state.reveal ? state.reveal.effectiveRule : state.currentRule;
     const flipClass = state.round !== lastRoundRendered ? 'flip' : '';
+    const pointClass = rule?.points ? `point-${rule.points}` : 'point-0';
     lastRoundRendered = state.round;
 
     app.innerHTML = `
@@ -192,10 +197,10 @@
           ${playerBandTemplate(state.opponent, 'opponent')}
           <div class="arena">
             ${carryTemplate()}
-            <div class="rule-card ${flipClass}">
+            <div class="rule-card ${pointClass} ${flipClass}">
               <div class="rule-heading">
                 <div class="rule-label">${escapeHtml(rule?.label || 'READY')}</div>
-                ${rule?.points ? `<div class="point-badge">${rule.points}PT</div>` : ''}
+                ${rule?.points ? `<div class="point-badge"><span>${rule.points}PT</span><small>${pointStars(rule.points)}</small></div>` : ''}
               </div>
               <div class="rule-summary">${escapeHtml(rule?.summary || '相手の入室を待っています')}</div>
             </div>
@@ -213,6 +218,7 @@
     `;
 
     bindGameEvents();
+    syncCountdownTimer();
   }
 
   function topbarTemplate() {
@@ -225,11 +231,13 @@
           <div class="score">
             <span class="score-name">${escapeHtml(you.name)}</span>
             <span class="score-value">${you.score}</span>
+            <span class="streak-line">${escapeHtml(streakText(you))}</span>
           </div>
           <span class="score-separator">-</span>
           <div class="score">
             <span class="score-name">${escapeHtml(opponent.name)}</span>
             <span class="score-value">${opponent.score}</span>
+            <span class="streak-line">${escapeHtml(streakText(opponent))}</span>
           </div>
         </div>
         <button class="rules-pill" type="button" data-rulebook>RULE</button>
@@ -406,7 +414,9 @@
 
   function noiseHandTemplate() {
     const canPick = state.phase === 'noise' && !state.choices?.you.noiseLocked;
-    const hand = state.you.noiseHand || [];
+    const hand = [...(state.you.noiseHand || [])].sort((left, right) => {
+      return noiseOrder.indexOf(left.type) - noiseOrder.indexOf(right.type);
+    });
     const noneSelected = selectedNoiseId === null;
     return `
       <div>
@@ -460,7 +470,12 @@
     if (state.phase === 'reveal') {
       const ready = state.ready[state.you.id];
       const label = state.reveal?.finalRound ? '最終結果へ' : '次のラウンドへ';
-      return `<button class="secondary" id="readyNext" ${ready ? 'disabled' : ''}>${ready ? '相手待ち' : label}</button>`;
+      return `
+        <div class="auto-next">
+          <button class="secondary" id="readyNext" ${ready ? 'disabled' : ''}>${ready ? '相手待ち' : label}</button>
+          <span data-auto-countdown>${escapeHtml(autoCountdownText())}</span>
+        </div>
+      `;
     }
 
     return '';
@@ -540,13 +555,53 @@
       if (state.choices?.you.noiseLocked) return `ノイズを送信しました。${opponentName}を待っています。`;
       return 'ノイズを1枚使うか、使わないを選びます。';
     }
-    if (state.phase === 'reveal') return '結果公開。両者が進むと次のラウンドです。';
+    if (state.phase === 'reveal') return state.reveal?.finalRound
+      ? '結果公開。5秒後に最終結果へ進みます。'
+      : '結果公開。5秒後に次のラウンドへ進みます。';
     if (state.phase === 'ended') return `全${state.totalRounds}ラウンド終了。`;
     return '';
   }
 
   function maxNumber() {
     return Number(state?.maxNumber || 7);
+  }
+
+  function pointStars(points) {
+    return '★'.repeat(Number(points || 0));
+  }
+
+  function streakText(player) {
+    const current = Number(player?.currentStreak || 0);
+    const best = Number(player?.maxStreak || 0);
+    if (current >= 2) return `${current}連勝中 / 最高${best}`;
+    return `最高${best}連勝`;
+  }
+
+  function autoCountdownText() {
+    if (state?.phase !== 'reveal' || !state.reveal?.autoAdvanceAt) return '';
+    const seconds = Math.max(0, Math.ceil((state.reveal.autoAdvanceAt - Date.now()) / 1000));
+    return state.reveal.finalRound
+      ? `${seconds}秒後に最終結果`
+      : `${seconds}秒後に次ラウンド`;
+  }
+
+  function syncCountdownTimer() {
+    clearCountdownTimer();
+    if (state?.phase !== 'reveal' || !state.reveal?.autoAdvanceAt) return;
+    updateCountdownText();
+    countdownTimer = setInterval(updateCountdownText, 250);
+  }
+
+  function updateCountdownText() {
+    const element = document.querySelector('[data-auto-countdown]');
+    if (!element) return;
+    element.textContent = autoCountdownText();
+  }
+
+  function clearCountdownTimer() {
+    if (!countdownTimer) return;
+    clearInterval(countdownTimer);
+    countdownTimer = null;
   }
 
   function isShiftPreviewing() {
@@ -647,6 +702,7 @@
   }
 
   function resetLocalRoom(shouldRender = true) {
+    clearCountdownTimer();
     storage.removeItem(roomKey);
     state = null;
     selectedNumber = null;

@@ -11,6 +11,7 @@ const INDEX_FILE = path.join(PUBLIC_DIR, 'index.html');
 const TOTAL_ROUNDS = 7;
 const MAX_NUMBER = 7;
 const FAR_CENTER = 4;
+const AUTO_ADVANCE_MS = 5000;
 
 const RULE_CARDS = [
   { type: 'BIG', points: 1 },
@@ -334,6 +335,7 @@ function leaveRoom(client) {
   if (!room || !roomCode || !playerId) return;
 
   if (room.mode === 'cpu') {
+    clearAutoAdvance(room);
     rooms.delete(roomCode);
     return;
   }
@@ -366,7 +368,9 @@ function createRoom(client, message) {
     carryRule: null,
     choices: null,
     ready: { A: false, B: false },
-    reveal: null
+    reveal: null,
+    autoAdvanceTimer: null,
+    autoAdvanceAt: null
   };
 
   rooms.set(room.code, room);
@@ -396,7 +400,9 @@ function createCpuRoom(client, message) {
     carryRule: null,
     choices: null,
     ready: { A: false, B: false },
-    reveal: null
+    reveal: null,
+    autoAdvanceTimer: null,
+    autoAdvanceAt: null
   };
 
   rooms.set(room.code, room);
@@ -561,17 +567,14 @@ function readyNext(client) {
   room.updatedAt = Date.now();
 
   if (room.ready.A && room.ready.B) {
-    if (room.round >= TOTAL_ROUNDS) {
-      endGame(room);
-    } else {
-      startRound(room);
-    }
+    advanceFromReveal(room);
   }
 
   broadcastRoom(room);
 }
 
 function startGame(room) {
+  clearAutoAdvance(room);
   room.status = 'active';
   room.phase = 'number';
   room.round = 0;
@@ -583,6 +586,8 @@ function startGame(room) {
   for (const player of Object.values(room.players)) {
     if (!player) continue;
     player.score = 0;
+    player.currentStreak = 0;
+    player.maxStreak = 0;
     player.usedNumbers = [];
     player.noiseHand = dealNoiseHand();
     player.noiseHistory = [];
@@ -593,6 +598,7 @@ function startGame(room) {
 }
 
 function startRound(room) {
+  clearAutoAdvance(room);
   room.round += 1;
   room.phase = 'number';
   room.currentRule = drawRule(room);
@@ -710,16 +716,28 @@ function resolveRound(room) {
   let pointsAwarded = 0;
   let carryOut = null;
   let scoreDetail;
+  let streakDetail = null;
 
   if (judgement.winner) {
     pointsAwarded = potentialPoints;
-    room.players[judgement.winner].score += pointsAwarded;
+    const winner = room.players[judgement.winner];
+    const loser = room.players[opponentId(judgement.winner)];
+    winner.score += pointsAwarded;
+    winner.currentStreak += 1;
+    winner.maxStreak = Math.max(winner.maxStreak, winner.currentStreak);
+    loser.currentStreak = 0;
     room.carryRule = null;
     scoreDetail = `${playerLabel(room, judgement.winner)}が${pointsAwarded}点を獲得しました。`;
+    if (winner.currentStreak >= 2) {
+      streakDetail = `${playerLabel(room, judgement.winner)}が${winner.currentStreak}連勝中です。`;
+      scoreDetail += ` ${streakDetail}`;
+    }
     if (carryIn) {
       logs.push(`キャリー中の${carryIn.label} ${carryIn.points}点も獲得対象になりました。`);
     }
   } else {
+    room.players.A.currentStreak = 0;
+    room.players.B.currentStreak = 0;
     carryOut = currentRule;
     room.carryRule = cloneRuleCard(currentRule);
     scoreDetail = room.round >= TOTAL_ROUNDS
@@ -759,6 +777,17 @@ function resolveRound(room) {
     carryOut,
     pointsAwarded,
     scoreDetail,
+    streakDetail,
+    streaks: {
+      A: {
+        current: playerA.currentStreak,
+        max: playerA.maxStreak
+      },
+      B: {
+        current: playerB.currentStreak,
+        max: playerB.maxStreak
+      }
+    },
     logs,
     privateNotes,
     winner: judgement.winner,
@@ -776,6 +805,7 @@ function resolveRound(room) {
     }
   }
   room.updatedAt = Date.now();
+  scheduleAutoAdvance(room);
 }
 
 function runCpuTurn(room) {
@@ -905,9 +935,48 @@ function chooseCpuShiftDirection(room, playerId, number) {
 }
 
 function endGame(room) {
+  clearAutoAdvance(room);
   room.status = 'ended';
   room.phase = 'ended';
   room.updatedAt = Date.now();
+}
+
+function advanceFromReveal(room) {
+  if (!room || room.phase !== 'reveal') return;
+  clearAutoAdvance(room);
+  if (room.round >= TOTAL_ROUNDS) {
+    endGame(room);
+  } else {
+    startRound(room);
+  }
+}
+
+function scheduleAutoAdvance(room) {
+  clearAutoAdvance(room);
+  if (!room || room.phase !== 'reveal') return;
+
+  const round = room.round;
+  room.autoAdvanceAt = Date.now() + AUTO_ADVANCE_MS;
+  if (room.reveal) {
+    room.reveal.autoAdvanceAt = room.autoAdvanceAt;
+  }
+
+  room.autoAdvanceTimer = setTimeout(() => {
+    const current = rooms.get(room.code);
+    if (!current || current.phase !== 'reveal' || current.round !== round) return;
+    advanceFromReveal(current);
+    broadcastRoom(current);
+  }, AUTO_ADVANCE_MS);
+  room.autoAdvanceTimer.unref?.();
+}
+
+function clearAutoAdvance(room) {
+  if (!room) return;
+  if (room.autoAdvanceTimer) {
+    clearTimeout(room.autoAdvanceTimer);
+  }
+  room.autoAdvanceTimer = null;
+  room.autoAdvanceAt = null;
 }
 
 function applyShift(room, playerId, finalNumbers, direction, source, logs) {
@@ -1125,6 +1194,8 @@ function createPlayer(id, sessionId, name, options = {}) {
     connected: Boolean(options.isCpu),
     isCpu: Boolean(options.isCpu),
     score: 0,
+    currentStreak: 0,
+    maxStreak: 0,
     usedNumbers: [],
     lastNumber: null,
     noiseHand: [],
@@ -1249,6 +1320,8 @@ function serializePlayer(player, isSelf) {
     connected: player.connected,
     isCpu: player.isCpu,
     score: player.score,
+    currentStreak: player.currentStreak,
+    maxStreak: player.maxStreak,
     usedNumbers: [...player.usedNumbers],
     lastNumber: player.lastNumber,
     noiseCount: player.noiseHand.length,
@@ -1286,11 +1359,12 @@ function revealFor(reveal, viewerId) {
 function matchResult(room) {
   const scoreA = room.players.A.score;
   const scoreB = room.players.B.score;
+  const streakSummary = `最高連勝 ${playerLabel(room, 'A')}: ${room.players.A.maxStreak} / ${playerLabel(room, 'B')}: ${room.players.B.maxStreak}`;
   if (scoreA === scoreB) {
     return {
       winner: null,
       title: 'DRAW',
-      detail: `${scoreA} - ${scoreB}`
+      detail: `${scoreA} - ${scoreB}。${streakSummary}`
     };
   }
 
@@ -1298,7 +1372,7 @@ function matchResult(room) {
   return {
     winner,
     title: `${playerLabel(room, winner)} WIN`,
-    detail: `${scoreA} - ${scoreB}`
+    detail: `${scoreA} - ${scoreB}。${streakSummary}`
   };
 }
 
@@ -1429,6 +1503,7 @@ function cleanupRooms() {
     const inactiveFor = now - room.updatedAt;
     const bothGone = !room.players.A?.connected && !room.players.B?.connected;
     if (bothGone && inactiveFor > 3 * 60 * 60 * 1000) {
+      clearAutoAdvance(room);
       rooms.delete(code);
     }
   }
