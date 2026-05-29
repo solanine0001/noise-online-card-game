@@ -10,6 +10,7 @@ const viewport = {
   height: Number(process.env.NOISE_VIEWPORT_HEIGHT || 844)
 };
 const runId = Date.now();
+const portBase = 9300 + (runId % 400);
 
 class CdpPage {
   constructor(wsUrl) {
@@ -119,12 +120,12 @@ class CdpPage {
   }
 }
 
-const browserA = await launchEdge(9331, `.edge-visual-${runId}-a`);
-const browserB = await launchEdge(9332, `.edge-visual-${runId}-b`);
+const browserA = await launchEdge(portBase, `.edge-visual-${runId}-a`);
+const browserB = await launchEdge(portBase + 1, `.edge-visual-${runId}-b`);
 
 try {
-  const pageA = await openCdpPage(9331);
-  const pageB = await openCdpPage(9332);
+  const pageA = await openCdpPage(portBase);
+  const pageB = await openCdpPage(portBase + 1);
 
   await pageA.navigate(baseUrl);
   await pageA.waitFor('document.querySelector("#nameInput")');
@@ -146,10 +147,11 @@ try {
     pageB.waitFor('document.querySelector(".rule-card")')
   ]);
 
+  await delay(650);
   await pageA.screenshot('noise-game-mobile.png');
 
   await pageA.click('button[data-number="4"]');
-  await pageB.click('button[data-number="8"]');
+  await pageB.click('button[data-number="6"]');
   await delay(120);
   await assertEnabledAfterPick(pageB, 'B');
   await pageB.click('#submitNumber');

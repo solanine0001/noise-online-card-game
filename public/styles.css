@@ -318,9 +318,9 @@ h1 {
 
 .used-strip {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 3px;
-  width: min(48vw, 260px);
+  width: min(42vw, 190px);
 }
 
 .used-dot {
@@ -347,6 +347,25 @@ h1 {
   padding: 6px 0;
 }
 
+.carry-banner {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 8px;
+  padding: 4px 8px;
+  background: rgba(231, 184, 79, 0.18);
+  color: var(--ink);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.carry-banner span {
+  color: var(--teal);
+}
+
 .rule-card {
   display: grid;
   min-height: 76px;
@@ -364,10 +383,31 @@ h1 {
   animation: ruleFlip 520ms ease both;
 }
 
+.rule-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .rule-label {
   font-size: clamp(1.9rem, 10vw, 4.2rem);
   line-height: 0.86;
   font-weight: 900;
+}
+
+.point-badge {
+  display: grid;
+  min-width: 48px;
+  min-height: 30px;
+  place-items: center;
+  border: 2px solid var(--black);
+  border-radius: 8px;
+  background: var(--yellow);
+  color: var(--black);
+  font-size: 0.82rem;
+  font-weight: 900;
+  box-shadow: 2px 2px 0 var(--black);
 }
 
 .rule-summary {
@@ -531,6 +571,12 @@ h1 {
   font-weight: 700;
 }
 
+.result-score {
+  color: #fffdf8;
+  font-size: 0.84rem;
+  font-weight: 900;
+}
+
 .private-note {
   border-left: 4px solid var(--teal);
   padding: 9px 10px;
@@ -590,7 +636,7 @@ h1 {
 
 .number-hand {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 6px;
 }
 

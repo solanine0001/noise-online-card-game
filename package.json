@@ -9,6 +9,7 @@
     "check": "node --check server.js",
     "smoke": "node scripts/smoke.mjs",
     "smoke:cpu": "node scripts/cpu-smoke.mjs",
+    "smoke:carry": "node scripts/carry-smoke.mjs",
     "visual": "node scripts/visual-check.mjs"
   },
   "engines": {

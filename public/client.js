@@ -191,8 +191,12 @@
         <section class="table">
           ${playerBandTemplate(state.opponent, 'opponent')}
           <div class="arena">
+            ${carryTemplate()}
             <div class="rule-card ${flipClass}">
-              <div class="rule-label">${escapeHtml(rule?.label || 'READY')}</div>
+              <div class="rule-heading">
+                <div class="rule-label">${escapeHtml(rule?.label || 'READY')}</div>
+                ${rule?.points ? `<div class="point-badge">${rule.points}PT</div>` : ''}
+              </div>
               <div class="rule-summary">${escapeHtml(rule?.summary || '相手の入室を待っています')}</div>
             </div>
             <p class="status-line">${escapeHtml(statusText())}</p>
@@ -244,7 +248,7 @@
           <span>${escapeHtml(name)}</span>
         </div>
         <div class="used-strip" aria-label="${escapeHtml(name)}の使用済み数字">
-          ${Array.from({ length: 10 }, (_, index) => {
+          ${Array.from({ length: maxNumber() }, (_, index) => {
             const number = index + 1;
             const used = player?.usedNumbers?.includes(number);
             return `<span class="used-dot ${used ? 'used' : ''}">${number}</span>`;
@@ -262,6 +266,26 @@
       <div class="noise-row">
         <div class="noise-reveal ${opponentNoise ? 'fired' : ''}">${escapeHtml(opponentNoise || 'NO NOISE')}</div>
         <div class="noise-reveal ${ownNoise ? 'fired' : ''}">${escapeHtml(ownNoise || 'NO NOISE')}</div>
+      </div>
+    `;
+  }
+
+  function carryTemplate() {
+    if (state.phase === 'ended') return '';
+    const carry = state.phase === 'reveal'
+      ? (state.reveal?.carryOut || state.reveal?.carryIn)
+      : state.carryRule;
+    if (!carry) return '';
+
+    const label = state.phase === 'reveal' && state.reveal?.carryOut
+      ? 'NEXT CARRY'
+      : state.phase === 'reveal'
+        ? 'CARRY USED'
+        : 'CARRY';
+    return `
+      <div class="carry-banner">
+        <span>${label}</span>
+        <strong>${escapeHtml(carry.label)} ${carry.points}PT</strong>
       </div>
     `;
   }
@@ -312,6 +336,7 @@
       <div class="result-banner ${winner ? '' : 'draw'}">
         <div class="result-title">${escapeHtml(title)}</div>
         <div class="result-detail">${escapeHtml(state.reveal.judgement.detail)}</div>
+        <div class="result-score">${escapeHtml(state.reveal.scoreDetail || '')}</div>
       </div>
     `;
   }
@@ -364,7 +389,7 @@
       <div>
         <div class="hand-title"><span>数字カード</span><span>${state.choices?.you.numberLocked ? '送信済み' : '1回だけ使用'}</span></div>
         <div class="number-hand">
-          ${Array.from({ length: 10 }, (_, index) => {
+          ${Array.from({ length: maxNumber() }, (_, index) => {
             const number = index + 1;
             const used = state.you.usedNumbers.includes(number);
             const selected = selectedNumber === number;
@@ -403,7 +428,7 @@
     if (selectedNoiseType !== 'Shift') return '';
     const pending = state.choices?.you.pendingNumber;
     const disableMinus = pending === 1;
-    const disablePlus = pending === 10;
+    const disablePlus = pending === maxNumber();
     return `
       <div class="shift-control">
         <button data-shift="-1" class="${shiftDirection === -1 ? 'selected' : ''}" ${canPick && !disableMinus ? '' : 'disabled'}>-1</button>
@@ -455,7 +480,7 @@
         selectedNoiseType = button.dataset.noiseType || null;
         const pending = state.choices?.you.pendingNumber;
         if (selectedNoiseType === 'Shift') {
-          shiftDirection = pending === 10 ? -1 : 1;
+          shiftDirection = pending === maxNumber() ? -1 : 1;
         }
         renderGame();
       });
@@ -509,8 +534,12 @@
       return 'ノイズを1枚使うか、使わないを選びます。';
     }
     if (state.phase === 'reveal') return '結果公開。両者が進むと次のラウンドです。';
-    if (state.phase === 'ended') return '全10ラウンド終了。';
+    if (state.phase === 'ended') return `全${state.totalRounds}ラウンド終了。`;
     return '';
+  }
+
+  function maxNumber() {
+    return Number(state?.maxNumber || 7);
   }
 
   function playerName(playerId) {

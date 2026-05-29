@@ -8,15 +8,24 @@ const path = require('path');
 const PORT = Number(process.env.PORT || 3000);
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const INDEX_FILE = path.join(PUBLIC_DIR, 'index.html');
-const TOTAL_ROUNDS = 10;
+const TOTAL_ROUNDS = 7;
+const MAX_NUMBER = 7;
+const FAR_CENTER = 4;
 
-const RULE_COUNTS = {
-  BIG: 3,
-  SMALL: 3,
-  FAR: 2,
-  CHAIN: 2,
-  EVEN: 2
-};
+const RULE_CARDS = [
+  { type: 'BIG', points: 1 },
+  { type: 'BIG', points: 2 },
+  { type: 'BIG', points: 2 },
+  { type: 'SMALL', points: 1 },
+  { type: 'SMALL', points: 2 },
+  { type: 'SMALL', points: 2 },
+  { type: 'FAR', points: 2 },
+  { type: 'FAR', points: 3 },
+  { type: 'CHAIN', points: 2 },
+  { type: 'CHAIN', points: 3 },
+  { type: 'EVEN', points: 2 },
+  { type: 'EVEN', points: 3 }
+];
 
 const RULES = {
   BIG: {
@@ -29,7 +38,7 @@ const RULES = {
   },
   FAR: {
     label: 'FAR',
-    summary: '5.5から遠い数字が勝利'
+    summary: '4から遠い数字が勝利'
   },
   CHAIN: {
     label: 'CHAIN',
@@ -354,6 +363,7 @@ function createRoom(client, message) {
     },
     ruleDeck: [],
     currentRule: null,
+    carryRule: null,
     choices: null,
     ready: { A: false, B: false },
     reveal: null
@@ -383,6 +393,7 @@ function createCpuRoom(client, message) {
     },
     ruleDeck: [],
     currentRule: null,
+    carryRule: null,
     choices: null,
     ready: { A: false, B: false },
     reveal: null
@@ -456,8 +467,8 @@ function submitNumber(client, message) {
   }
 
   const number = Number(message.number);
-  if (!Number.isInteger(number) || number < 1 || number > 10) {
-    sendError(client, '1から10の数字を選んでください。');
+  if (!Number.isInteger(number) || number < 1 || number > MAX_NUMBER) {
+    sendError(client, `1から${MAX_NUMBER}の数字を選んでください。`);
     return;
   }
   if (player.usedNumbers.includes(number)) {
@@ -566,6 +577,7 @@ function startGame(room) {
   room.round = 0;
   room.ruleDeck = makeRuleDeck();
   room.reveal = null;
+  room.carryRule = null;
   room.ready = { A: false, B: false };
 
   for (const player of Object.values(room.players)) {
@@ -692,8 +704,30 @@ function resolveRound(room) {
     B: playerB.lastNumber
   });
 
+  const carryIn = room.carryRule ? cloneRuleCard(room.carryRule) : null;
+  const currentRule = cloneRuleCard(room.currentRule);
+  const potentialPoints = currentRule.points + (carryIn?.points || 0);
+  let pointsAwarded = 0;
+  let carryOut = null;
+  let scoreDetail;
+
   if (judgement.winner) {
-    room.players[judgement.winner].score += 1;
+    pointsAwarded = potentialPoints;
+    room.players[judgement.winner].score += pointsAwarded;
+    room.carryRule = null;
+    scoreDetail = `${playerLabel(room, judgement.winner)}が${pointsAwarded}点を獲得しました。`;
+    if (carryIn) {
+      logs.push(`キャリー中の${carryIn.label} ${carryIn.points}点も獲得対象になりました。`);
+    }
+  } else {
+    carryOut = currentRule;
+    room.carryRule = cloneRuleCard(currentRule);
+    scoreDetail = room.round >= TOTAL_ROUNDS
+      ? `${currentRule.label} ${currentRule.points}点は引き分けで流れました。`
+      : `${currentRule.label} ${currentRule.points}点が次ラウンドへキャリーされます。`;
+    if (carryIn) {
+      logs.push(`古いキャリー${carryIn.label} ${carryIn.points}点は消滅しました。`);
+    }
   }
 
   for (const playerId of ['A', 'B']) {
@@ -720,6 +754,11 @@ function resolveRound(room) {
     },
     reversed,
     effectiveRule: effectiveRule(room.currentRule, reversed),
+    currentRule,
+    carryIn,
+    carryOut,
+    pointsAwarded,
+    scoreDetail,
     logs,
     privateNotes,
     winner: judgement.winner,
@@ -782,7 +821,7 @@ function runCpuTurn(room) {
 
 function chooseCpuNumber(room, playerId) {
   const player = room.players[playerId];
-  const available = range(1, 10).filter((number) => !player.usedNumbers.includes(number));
+  const available = range(1, MAX_NUMBER).filter((number) => !player.usedNumbers.includes(number));
   if (available.length === 0) return 1;
 
   const scored = shuffle(available).map((number) => ({
@@ -795,18 +834,18 @@ function chooseCpuNumber(room, playerId) {
 }
 
 function cpuNumberScore(room, playerId, number) {
-  const rule = room.currentRule;
+  const rule = room.currentRule?.type;
   const player = room.players[playerId];
 
   if (rule === 'BIG') return number;
-  if (rule === 'SMALL') return 11 - number;
-  if (rule === 'FAR') return Math.round(Math.abs(number - 5.5) * 2);
-  if (rule === 'EVEN') return (number % 2 === 0 ? 12 : 0) + number;
+  if (rule === 'SMALL') return MAX_NUMBER + 1 - number;
+  if (rule === 'FAR') return Math.abs(number - FAR_CENTER) * 2;
+  if (rule === 'EVEN') return (number % 2 === 0 ? MAX_NUMBER + 2 : 0) + number;
   if (rule === 'CHAIN' && player.lastNumber !== null) {
-    return 12 - Math.abs(number - player.lastNumber);
+    return MAX_NUMBER + 2 - Math.abs(number - player.lastNumber);
   }
 
-  return 6 - Math.abs(number - 5.5);
+  return MAX_NUMBER + 1 - Math.abs(number - FAR_CENTER);
 }
 
 function chooseCpuNoise(room, playerId) {
@@ -843,21 +882,22 @@ function cpuNoiseScore(room, playerId, card) {
 
 function cpuReverseScore(room, playerId) {
   const number = room.choices[playerId].number;
-  if (room.currentRule === 'BIG') return number <= 5 ? 8 : 2;
-  if (room.currentRule === 'SMALL') return number >= 6 ? 8 : 2;
-  if (room.currentRule === 'FAR') return Math.abs(number - 5.5) <= 2 ? 8 : 2;
-  if (room.currentRule === 'EVEN') return number % 2 === 1 ? 8 : 3;
-  if (room.currentRule === 'CHAIN') {
+  const rule = room.currentRule?.type;
+  if (rule === 'BIG') return number <= 3 ? 8 : 2;
+  if (rule === 'SMALL') return number >= 5 ? 8 : 2;
+  if (rule === 'FAR') return Math.abs(number - FAR_CENTER) <= 1 ? 8 : 2;
+  if (rule === 'EVEN') return number % 2 === 1 ? 8 : 3;
+  if (rule === 'CHAIN') {
     const last = room.players[playerId].lastNumber;
     if (last === null) return 0;
-    return Math.abs(number - last) >= 4 ? 8 : 2;
+    return Math.abs(number - last) >= 3 ? 8 : 2;
   }
   return 4;
 }
 
 function chooseCpuShiftDirection(room, playerId, number) {
   if (number === 1) return 1;
-  if (number === 10) return -1;
+  if (number === MAX_NUMBER) return -1;
 
   const plusScore = cpuNumberScore(room, playerId, number + 1);
   const minusScore = cpuNumberScore(room, playerId, number - 1);
@@ -904,25 +944,26 @@ function isNoiseCardLocked(card, round) {
 }
 
 function judgeRound(rule, reversed, numbers, previousNumbers) {
-  if (rule === 'BIG') {
+  const type = rule.type;
+  if (type === 'BIG') {
     return compareNumbers(numbers.A, numbers.B, reversed ? 'low' : 'high', effectiveRule(rule, reversed));
   }
-  if (rule === 'SMALL') {
+  if (type === 'SMALL') {
     return compareNumbers(numbers.A, numbers.B, reversed ? 'high' : 'low', effectiveRule(rule, reversed));
   }
-  if (rule === 'FAR') {
+  if (type === 'FAR') {
     const distances = {
-      A: Math.abs(numbers.A - 5.5),
-      B: Math.abs(numbers.B - 5.5)
+      A: Math.abs(numbers.A - FAR_CENTER),
+      B: Math.abs(numbers.B - FAR_CENTER)
     };
     const mode = reversed ? 'low' : 'high';
     return compareMetrics(distances.A, distances.B, mode, effectiveRule(rule, reversed), {
       A: `距離${distances.A}`,
       B: `距離${distances.B}`,
-      tie: '5.5からの距離が同じでした。'
+      tie: `${FAR_CENTER}からの距離が同じでした。`
     });
   }
-  if (rule === 'CHAIN') {
+  if (type === 'CHAIN') {
     if (previousNumbers.A === null || previousNumbers.B === null) {
       return {
         winner: null,
@@ -942,7 +983,7 @@ function judgeRound(rule, reversed, numbers, previousNumbers) {
       tie: '前回との差が同じでした。'
     });
   }
-  if (rule === 'EVEN') {
+  if (type === 'EVEN') {
     return judgeEven(numbers, reversed);
   }
 
@@ -1029,15 +1070,24 @@ function judgeEven(numbers, reversed) {
 }
 
 function effectiveRule(rule, reversed) {
-  if (!reversed) return { label: RULES[rule]?.label || rule, summary: RULES[rule]?.summary || '' };
+  const type = rule.type;
+  const points = rule.points;
+  if (!reversed) {
+    return {
+      type,
+      points,
+      label: RULES[type]?.label || type,
+      summary: RULES[type]?.summary || ''
+    };
+  }
 
-  if (rule === 'BIG') return { label: 'SMALL', summary: 'Reverseにより小さい数字が勝利' };
-  if (rule === 'SMALL') return { label: 'BIG', summary: 'Reverseにより大きい数字が勝利' };
-  if (rule === 'FAR') return { label: 'NEAR', summary: 'Reverseにより5.5に近い数字が勝利' };
-  if (rule === 'CHAIN') return { label: 'CHAIN+', summary: 'Reverseにより前回との差が大きい方が勝利' };
-  if (rule === 'EVEN') return { label: 'ODD', summary: 'Reverseにより奇数が優先。同性質なら小さい数字' };
+  if (type === 'BIG') return { type, points, label: 'SMALL', summary: 'Reverseにより小さい数字が勝利' };
+  if (type === 'SMALL') return { type, points, label: 'BIG', summary: 'Reverseにより大きい数字が勝利' };
+  if (type === 'FAR') return { type, points, label: 'NEAR', summary: `Reverseにより${FAR_CENTER}に近い数字が勝利` };
+  if (type === 'CHAIN') return { type, points, label: 'CHAIN+', summary: 'Reverseにより前回との差が大きい方が勝利' };
+  if (type === 'EVEN') return { type, points, label: 'ODD', summary: 'Reverseにより奇数が優先。同性質なら小さい数字' };
 
-  return { label: rule, summary: '' };
+  return { type, points, label: type, summary: '' };
 }
 
 function consumeNoise(player, noise) {
@@ -1060,7 +1110,7 @@ function findEchoTarget(opponentPlayerId, room) {
 
 function normalizeShiftDirection(number, value) {
   if (number === 1) return 1;
-  if (number === 10) return -1;
+  if (number === MAX_NUMBER) return -1;
   const direction = Number(value);
   if (direction === 1 || direction === -1) return direction;
   return null;
@@ -1171,11 +1221,9 @@ function snapshotFor(room, viewerId) {
     phase: room.phase,
     round: room.round,
     totalRounds: room.totalRounds,
-    currentRule: room.currentRule ? {
-      type: room.currentRule,
-      label: RULES[room.currentRule].label,
-      summary: RULES[room.currentRule].summary
-    } : null,
+    maxNumber: MAX_NUMBER,
+    currentRule: serializeRuleCard(room.currentRule),
+    carryRule: serializeRuleCard(room.carryRule),
     you: serializePlayer(room.players[viewerId], true),
     opponent: serializePlayer(room.players[opponent], false),
     choices: serializeChoices(room, viewerId),
@@ -1262,11 +1310,10 @@ function sendError(client, message) {
 }
 
 function makeRuleDeck() {
-  const deck = [];
-  for (const [rule, count] of Object.entries(RULE_COUNTS)) {
-    for (let index = 0; index < count; index += 1) deck.push(rule);
-  }
-  return shuffle(deck);
+  return shuffle(RULE_CARDS).map((card, index) => ({
+    ...card,
+    id: `rule_${index}_${card.type}_${card.points}`
+  }));
 }
 
 function drawRule(room) {
@@ -1274,14 +1321,30 @@ function drawRule(room) {
 
   for (let attempts = 0; attempts < room.ruleDeck.length + 1; attempts += 1) {
     const rule = room.ruleDeck.shift();
-    if (room.round === 1 && rule === 'CHAIN') {
+    if (room.round === 1 && rule.type === 'CHAIN') {
       room.ruleDeck.push(rule);
       continue;
     }
-    return rule;
+    return cloneRuleCard(rule);
   }
 
-  return 'BIG';
+  return cloneRuleCard({ type: 'BIG', points: 1, id: 'fallback_BIG_1' });
+}
+
+function cloneRuleCard(card) {
+  if (!card) return null;
+  const type = card.type;
+  return {
+    id: card.id || makeId('rule'),
+    type,
+    points: card.points,
+    label: RULES[type]?.label || type,
+    summary: RULES[type]?.summary || ''
+  };
+}
+
+function serializeRuleCard(card) {
+  return card ? cloneRuleCard(card) : null;
 }
 
 function dealNoiseHand() {

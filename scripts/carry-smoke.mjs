@@ -54,49 +54,68 @@ function createClient(label) {
   });
 }
 
-const a = await createClient('A');
-const b = await createClient('B');
+async function submitRound(a, b, aNumber, bNumber) {
+  a.send({ type: 'submitNumber', number: aNumber });
+  b.send({ type: 'submitNumber', number: bNumber });
+  await Promise.all([
+    a.waitFor((state) => state?.phase === 'noise'),
+    b.waitFor((state) => state?.phase === 'noise')
+  ]);
 
-a.send({ type: 'createRoom', sessionId: 'smoke-a', name: 'Smoke A' });
+  a.send({ type: 'submitNoise', cardId: null });
+  b.send({ type: 'submitNoise', cardId: null });
+  await Promise.all([
+    a.waitFor((state) => state?.phase === 'reveal'),
+    b.waitFor((state) => state?.phase === 'reveal')
+  ]);
+}
+
+const a = await createClient('Carry A');
+const b = await createClient('Carry B');
+
+a.send({ type: 'createRoom', sessionId: 'carry-a', name: 'Carry A' });
 await a.waitFor((state) => state?.status === 'lobby');
 
-b.send({ type: 'joinRoom', sessionId: 'smoke-b', name: 'Smoke B', roomCode: a.state.roomCode });
+b.send({ type: 'joinRoom', sessionId: 'carry-b', name: 'Carry B', roomCode: a.state.roomCode });
 await Promise.all([
   a.waitFor((state) => state?.phase === 'number'),
   b.waitFor((state) => state?.phase === 'number')
 ]);
 
-a.send({ type: 'submitNumber', number: 4 });
-b.send({ type: 'submitNumber', number: 6 });
+await submitRound(a, b, 4, 4);
 
+if (a.state.reveal.winner !== null) {
+  throw new Error('First round should draw and create carry');
+}
+if (!a.state.reveal.carryOut || !a.state.carryRule) {
+  throw new Error('Carry card was not created after draw');
+}
+
+const carryPoints = a.state.reveal.carryOut.points;
+a.send({ type: 'readyNext' });
+b.send({ type: 'readyNext' });
 await Promise.all([
-  a.waitFor((state) => state?.phase === 'noise'),
-  b.waitFor((state) => state?.phase === 'noise')
+  a.waitFor((state) => state?.round === 2 && state?.phase === 'number'),
+  b.waitFor((state) => state?.round === 2 && state?.phase === 'number')
 ]);
 
-const firstNoise = a.state.you.noiseHand[0];
-a.send({
-  type: 'submitNoise',
-  cardId: firstNoise.id,
-  direction: firstNoise.type === 'Shift' ? 1 : null
-});
-b.send({ type: 'submitNoise', cardId: null });
+await submitRound(a, b, 1, 6);
 
-await Promise.all([
-  a.waitFor((state) => state?.phase === 'reveal'),
-  b.waitFor((state) => state?.phase === 'reveal')
-]);
+if (!a.state.reveal.winner) {
+  throw new Error('Second round should have a winner');
+}
+if (!a.state.reveal.carryIn || a.state.reveal.pointsAwarded !== carryPoints + a.state.reveal.currentRule.points) {
+  throw new Error('Carry points were not awarded with current rule points');
+}
 
-const summary = {
+console.log(JSON.stringify({
   roomCode: a.state.roomCode,
-  rule: a.state.currentRule.label,
-  phase: a.state.phase,
-  noiseUsed: firstNoise.type,
-  numbers: a.state.reveal.finalNumbers,
+  carryPoints,
+  roundTwoRule: `${a.state.reveal.currentRule.label} ${a.state.reveal.currentRule.points}PT`,
   winner: a.state.reveal.winner,
-  detail: a.state.reveal.judgement.detail
-};
+  pointsAwarded: a.state.reveal.pointsAwarded,
+  scoreDetail: a.state.reveal.scoreDetail
+}, null, 2));
 
-console.log(JSON.stringify(summary, null, 2));
 a.close();
 b.close();
