@@ -115,11 +115,12 @@
             <input id="nameInput" maxlength="18" autocomplete="name" value="${savedName}" placeholder="Player">
           </label>
           <button class="primary" id="createBtn" ${connected ? '' : 'disabled'}>ルーム作成</button>
+          <button class="secondary" id="cpuBtn" ${connected ? '' : 'disabled'}>CPUと対戦</button>
           <label class="field">
             <span>ルームコード</span>
             <input id="roomInput" maxlength="8" autocapitalize="characters" value="${roomValue}" placeholder="ABCDE">
           </label>
-          <button class="secondary" id="joinBtn" ${connected ? '' : 'disabled'}>参加</button>
+          <button class="ghost" id="joinBtn" ${connected ? '' : 'disabled'}>参加</button>
           <button class="ghost" type="button" data-rulebook>ルールブック</button>
         </div>
       </section>
@@ -131,6 +132,13 @@
     document.getElementById('createBtn').addEventListener('click', () => {
       send({
         type: 'createRoom',
+        sessionId,
+        name: getPlayerName()
+      });
+    });
+    document.getElementById('cpuBtn').addEventListener('click', () => {
+      send({
+        type: 'createCpuRoom',
         sessionId,
         name: getPlayerName()
       });
@@ -407,12 +415,14 @@
   function actionTemplate() {
     if (state.phase === 'number') {
       const locked = state.choices?.you.numberLocked;
-      return `<button class="primary" id="submitNumber" ${selectedNumber && !locked ? '' : 'disabled'}>${locked ? '相手の数字待ち' : '伏せて送信'}</button>`;
+      const lockedLabel = state.opponent?.isCpu ? 'CPUが数字を選択済み' : '相手の数字待ち';
+      return `<button class="primary" id="submitNumber" ${selectedNumber && !locked ? '' : 'disabled'}>${locked ? lockedLabel : '伏せて送信'}</button>`;
     }
 
     if (state.phase === 'noise') {
       const locked = state.choices?.you.noiseLocked;
-      return `<button class="primary" id="submitNoise" ${locked ? 'disabled' : ''}>${locked ? '相手のノイズ待ち' : 'ノイズ送信'}</button>`;
+      const lockedLabel = state.opponent?.isCpu ? 'CPUがノイズを選択済み' : '相手のノイズ待ち';
+      return `<button class="primary" id="submitNoise" ${locked ? 'disabled' : ''}>${locked ? lockedLabel : 'ノイズ送信'}</button>`;
     }
 
     if (state.phase === 'reveal') {
@@ -481,6 +491,7 @@
 
   function statusText() {
     if (!connected) return '再接続中です。操作は接続後に再開されます。';
+    if (state.opponent?.isCpu) return 'CPUとの対戦中です。CPUの選択は伏せられています。';
     if (!state.opponent?.connected) return '相手の再接続を待っています。';
     if (state.phase === 'number') {
       if (state.choices?.you.numberLocked) return '数字を伏せました。相手を待っています。';

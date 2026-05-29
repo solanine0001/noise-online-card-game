@@ -8,6 +8,7 @@
     "start": "node server.js",
     "check": "node --check server.js",
     "smoke": "node scripts/smoke.mjs",
+    "smoke:cpu": "node scripts/cpu-smoke.mjs",
     "visual": "node scripts/visual-check.mjs"
   },
   "engines": {

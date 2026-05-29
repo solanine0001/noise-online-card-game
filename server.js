@@ -282,6 +282,10 @@ function handleMessage(client, message) {
     createRoom(client, message);
     return;
   }
+  if (type === 'createCpuRoom') {
+    createCpuRoom(client, message);
+    return;
+  }
   if (type === 'joinRoom') {
     joinRoom(client, message);
     return;
@@ -315,6 +319,7 @@ function createRoom(client, message) {
     createdAt: Date.now(),
     updatedAt: Date.now(),
     status: 'lobby',
+    mode: 'online',
     phase: 'lobby',
     round: 0,
     totalRounds: TOTAL_ROUNDS,
@@ -331,6 +336,37 @@ function createRoom(client, message) {
 
   rooms.set(room.code, room);
   attachClient(client, room, room.players.A);
+  broadcastRoom(room);
+}
+
+function createCpuRoom(client, message) {
+  detachFromCurrentRoom(client, false);
+
+  const sessionId = normalizeSessionId(message.sessionId) || makeId('session');
+  const room = {
+    code: makeRoomCode(),
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    status: 'lobby',
+    mode: 'cpu',
+    phase: 'lobby',
+    round: 0,
+    totalRounds: TOTAL_ROUNDS,
+    players: {
+      A: createPlayer('A', sessionId, message.name || 'Player A'),
+      B: createPlayer('B', makeId('cpu'), 'CPU', { isCpu: true })
+    },
+    ruleDeck: [],
+    currentRule: null,
+    choices: null,
+    ready: { A: false, B: false },
+    reveal: null
+  };
+
+  rooms.set(room.code, room);
+  attachClient(client, room, room.players.A);
+  room.players.B.connected = true;
+  startGame(room);
   broadcastRoom(room);
 }
 
@@ -417,6 +453,7 @@ function submitNumber(client, message) {
     room.phase = 'noise';
   }
 
+  runCpuTurn(room);
   broadcastRoom(room);
 }
 
@@ -472,6 +509,7 @@ function submitNoise(client, message) {
     resolveRound(room);
   }
 
+  runCpuTurn(room);
   broadcastRoom(room);
 }
 
@@ -528,6 +566,7 @@ function startRound(room) {
   room.ready = { A: false, B: false };
   room.reveal = null;
   room.updatedAt = Date.now();
+  runCpuTurn(room);
 }
 
 function resolveRound(room) {
@@ -667,7 +706,137 @@ function resolveRound(room) {
     finalRound: room.round >= TOTAL_ROUNDS
   };
   room.ready = { A: false, B: false };
+  for (const playerId of ['A', 'B']) {
+    if (room.players[playerId]?.isCpu) {
+      room.ready[playerId] = true;
+    }
+  }
   room.updatedAt = Date.now();
+}
+
+function runCpuTurn(room) {
+  if (room.status !== 'active') return;
+
+  for (const playerId of ['A', 'B']) {
+    const player = room.players[playerId];
+    if (!player?.isCpu) continue;
+
+    if (room.phase === 'number' && room.choices[playerId].number === null) {
+      room.choices[playerId].number = chooseCpuNumber(room, playerId);
+    }
+  }
+
+  if (room.phase === 'number' && room.choices.A.number !== null && room.choices.B.number !== null) {
+    room.phase = 'noise';
+  }
+
+  for (const playerId of ['A', 'B']) {
+    const player = room.players[playerId];
+    if (!player?.isCpu) continue;
+
+    if (room.phase === 'noise' && !room.choices[playerId].noiseSubmitted) {
+      room.choices[playerId].noise = chooseCpuNoise(room, playerId);
+      room.choices[playerId].noiseSubmitted = true;
+    }
+  }
+
+  if (room.phase === 'noise' && room.choices.A.noiseSubmitted && room.choices.B.noiseSubmitted) {
+    resolveRound(room);
+  }
+
+  if (room.phase === 'reveal') {
+    for (const playerId of ['A', 'B']) {
+      if (room.players[playerId]?.isCpu) {
+        room.ready[playerId] = true;
+      }
+    }
+  }
+
+  room.updatedAt = Date.now();
+}
+
+function chooseCpuNumber(room, playerId) {
+  const player = room.players[playerId];
+  const available = range(1, 10).filter((number) => !player.usedNumbers.includes(number));
+  if (available.length === 0) return 1;
+
+  const scored = shuffle(available).map((number) => ({
+    number,
+    score: cpuNumberScore(room, playerId, number) + crypto.randomInt(0, 4)
+  }));
+
+  scored.sort((left, right) => right.score - left.score);
+  return scored[0].number;
+}
+
+function cpuNumberScore(room, playerId, number) {
+  const rule = room.currentRule;
+  const player = room.players[playerId];
+
+  if (rule === 'BIG') return number;
+  if (rule === 'SMALL') return 11 - number;
+  if (rule === 'FAR') return Math.round(Math.abs(number - 5.5) * 2);
+  if (rule === 'EVEN') return (number % 2 === 0 ? 12 : 0) + number;
+  if (rule === 'CHAIN' && player.lastNumber !== null) {
+    return 12 - Math.abs(number - player.lastNumber);
+  }
+
+  return 6 - Math.abs(number - 5.5);
+}
+
+function chooseCpuNoise(room, playerId) {
+  const player = room.players[playerId];
+  const playable = player.noiseHand.filter((card) => !isNoiseCardLocked(card, room.round));
+  if (playable.length === 0) return null;
+
+  const currentNumber = room.choices[playerId].number;
+  const candidates = playable.map((card) => ({
+    card,
+    score: cpuNoiseScore(room, playerId, card) + crypto.randomInt(0, 4)
+  }));
+  candidates.sort((left, right) => right.score - left.score);
+
+  const best = candidates[0];
+  if (best.score < 5 && crypto.randomInt(100) < 55) return null;
+  if (crypto.randomInt(100) < 26) return null;
+
+  return {
+    cardId: best.card.id,
+    type: best.card.type,
+    direction: best.card.type === 'Shift' ? chooseCpuShiftDirection(room, playerId, currentNumber) : null
+  };
+}
+
+function cpuNoiseScore(room, playerId, card) {
+  if (card.type === 'Jam') return 4;
+  if (card.type === 'Peek') return room.players[opponentId(playerId)].noiseHand.length > 0 ? 7 : 0;
+  if (card.type === 'Echo') return findEchoTarget(opponentId(playerId), room) ? 6 : 0;
+  if (card.type === 'Reverse') return cpuReverseScore(room, playerId);
+  if (card.type === 'Shift') return 7;
+  return 3;
+}
+
+function cpuReverseScore(room, playerId) {
+  const number = room.choices[playerId].number;
+  if (room.currentRule === 'BIG') return number <= 5 ? 8 : 2;
+  if (room.currentRule === 'SMALL') return number >= 6 ? 8 : 2;
+  if (room.currentRule === 'FAR') return Math.abs(number - 5.5) <= 2 ? 8 : 2;
+  if (room.currentRule === 'EVEN') return number % 2 === 1 ? 8 : 3;
+  if (room.currentRule === 'CHAIN') {
+    const last = room.players[playerId].lastNumber;
+    if (last === null) return 0;
+    return Math.abs(number - last) >= 4 ? 8 : 2;
+  }
+  return 4;
+}
+
+function chooseCpuShiftDirection(room, playerId, number) {
+  if (number === 1) return 1;
+  if (number === 10) return -1;
+
+  const plusScore = cpuNumberScore(room, playerId, number + 1);
+  const minusScore = cpuNumberScore(room, playerId, number - 1);
+  return plusScore >= minusScore ? 1 : -1;
 }
 
 function endGame(room) {
@@ -872,13 +1041,14 @@ function normalizeShiftDirection(number, value) {
   return null;
 }
 
-function createPlayer(id, sessionId, name) {
+function createPlayer(id, sessionId, name, options = {}) {
   return {
     id,
     sessionId,
     name: normalizeName(name, id),
     socket: null,
-    connected: false,
+    connected: Boolean(options.isCpu),
+    isCpu: Boolean(options.isCpu),
     score: 0,
     usedNumbers: [],
     lastNumber: null,
@@ -1004,6 +1174,7 @@ function serializePlayer(player, isSelf) {
     id: player.id,
     name: player.name,
     connected: player.connected,
+    isCpu: player.isCpu,
     score: player.score,
     usedNumbers: [...player.usedNumbers],
     lastNumber: player.lastNumber,
@@ -1107,6 +1278,14 @@ function shuffle(items) {
 function pick(items) {
   if (!items.length) return null;
   return items[crypto.randomInt(items.length)];
+}
+
+function range(start, end) {
+  const values = [];
+  for (let value = start; value <= end; value += 1) {
+    values.push(value);
+  }
+  return values;
 }
 
 function makeRoomCode() {
