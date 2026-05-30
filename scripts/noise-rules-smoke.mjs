@@ -44,9 +44,22 @@ vm.runInContext(code, sandbox, { filename: 'server.js' });
 
 const { resolveRound, createPlayer, cloneRuleCard, matchResult, dealNoiseHands } = sandbox.__noiseTest;
 
-function makeRoom({ ruleType = 'BIG', points = 1, round = 1, aNumber, bNumber, aNoise = null, bNoise = null, carryRule = null }) {
+function makeRoom({
+  ruleType = 'BIG',
+  points = 1,
+  round = 1,
+  aNumber,
+  bNumber,
+  aNoise = null,
+  bNoise = null,
+  carryRule = null,
+  aLastNumber = null,
+  bLastNumber = null
+}) {
   const playerA = createPlayer('A', 'test-a', 'A');
   const playerB = createPlayer('B', 'test-b', 'B');
+  playerA.lastNumber = aLastNumber;
+  playerB.lastNumber = bLastNumber;
   if (aNoise) playerA.noiseHand = [{ id: `a_${aNoise}`, type: aNoise }];
   if (bNoise) playerB.noiseHand = [{ id: `b_${bNoise}`, type: bNoise }];
 
@@ -93,7 +106,9 @@ function runCase(name, config, check) {
     raiseBonus: room.reveal.raiseBonus,
     carry: room.carryRule ? `${room.carryRule.label} ${room.carryRule.points}` : null,
     usedA: room.players.A.usedNumbers,
-    usedB: room.players.B.usedNumbers
+    usedB: room.players.B.usedNumbers,
+    lastA: room.players.A.lastNumber,
+    lastB: room.players.B.lastNumber
   };
 }
 
@@ -170,6 +185,21 @@ results.push(runCase('Hold preserves number', {
   assert(room.reveal.winner === 'A', 'Hold win should still resolve normally', room.reveal);
   assert(!room.players.A.usedNumbers.includes(7), 'Held number should not become used', room.players.A.usedNumbers);
   assert(room.players.B.usedNumbers.includes(1), 'Non-held number should become used', room.players.B.usedNumbers);
+  assert(room.players.A.lastNumber === 7, 'Held number should still update CHAIN previous number', room.players.A);
+}));
+
+results.push(runCase('CHAIN uses previous held number', {
+  ruleType: 'CHAIN',
+  points: 2,
+  round: 2,
+  aLastNumber: 7,
+  bLastNumber: 1,
+  aNumber: 7,
+  bNumber: 5
+}, (room) => {
+  assert(room.reveal.winner === 'A', 'CHAIN should use held previous number as lastNumber', room.reveal);
+  assert(room.reveal.judgement.detail.includes('差0'), 'A should have zero difference from held previous number', room.reveal.judgement);
+  assert(room.players.A.usedNumbers.includes(7), 'Reused held number should become used if Hold is not used again', room.players.A.usedNumbers);
 }));
 
 results.push(runCase('Mute cancels Hold', {
