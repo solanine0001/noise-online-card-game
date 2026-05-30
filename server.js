@@ -571,6 +571,7 @@ function startGame(room) {
   room.phase = 'number';
   room.round = 0;
   room.ruleDeck = makeRuleDeck();
+  const noiseHands = dealNoiseHands();
   room.reveal = null;
   room.carryRule = null;
   room.ready = { A: false, B: false };
@@ -581,7 +582,7 @@ function startGame(room) {
     player.currentStreak = 0;
     player.maxStreak = 0;
     player.usedNumbers = [];
-    player.noiseHand = dealNoiseHand();
+    player.noiseHand = noiseHands[player.id] || [];
     player.lastNumber = null;
   }
 
@@ -1355,11 +1356,16 @@ function serializeRuleCard(card) {
   return card ? cloneRuleCard(card) : null;
 }
 
-function dealNoiseHand() {
-  return shuffle([...NOISE_TYPES]).slice(0, 3).map((type) => ({
+function dealNoiseHands() {
+  const deck = shuffle([...NOISE_TYPES]).map((type) => ({
     id: makeId('noise'),
     type
   }));
+
+  return {
+    A: deck.slice(0, 3),
+    B: deck.slice(3, 6)
+  };
 }
 
 function shuffle(items) {

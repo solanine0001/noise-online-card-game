@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const code = `${fs.readFileSync('server.js', 'utf8')}
-globalThis.__noiseTest = { resolveRound, createPlayer, cloneRuleCard, matchResult };`;
+globalThis.__noiseTest = { resolveRound, createPlayer, cloneRuleCard, matchResult, dealNoiseHands };`;
 
 const httpStub = {
   createServer() {
@@ -42,7 +42,7 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(code, sandbox, { filename: 'server.js' });
 
-const { resolveRound, createPlayer, cloneRuleCard, matchResult } = sandbox.__noiseTest;
+const { resolveRound, createPlayer, cloneRuleCard, matchResult, dealNoiseHands } = sandbox.__noiseTest;
 
 function makeRoom({ ruleType = 'BIG', points = 1, round = 1, aNumber, bNumber, aNoise = null, bNoise = null, carryRule = null }) {
   const playerA = createPlayer('A', 'test-a', 'A');
@@ -98,6 +98,19 @@ function runCase(name, config, check) {
 }
 
 const results = [];
+
+const dealtHands = dealNoiseHands();
+const dealtTypes = [...dealtHands.A, ...dealtHands.B].map((card) => card.type);
+assert(dealtHands.A.length === 3, 'Player A should receive 3 noise cards', dealtHands);
+assert(dealtHands.B.length === 3, 'Player B should receive 3 noise cards', dealtHands);
+assert(new Set(dealtTypes).size === 6, 'The shared 6-card noise deck should be split without duplicates', dealtHands);
+assert(dealtTypes.every((type) => ['Reverse', 'Mute', 'Shift', 'Raise', 'Sync', 'Hold'].includes(type)), 'Dealt deck should only contain current noise cards', dealtTypes);
+
+results.push({
+  name: 'Shared noise deck deal',
+  playerA: dealtHands.A.map((card) => card.type),
+  playerB: dealtHands.B.map((card) => card.type)
+});
 
 results.push(runCase('Raise adds points on win', {
   ruleType: 'BIG',
