@@ -4,7 +4,7 @@ import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const code = `${fs.readFileSync('server.js', 'utf8')}
-globalThis.__noiseTest = { resolveRound, createPlayer, cloneRuleCard };`;
+globalThis.__noiseTest = { resolveRound, createPlayer, cloneRuleCard, matchResult };`;
 
 const httpStub = {
   createServer() {
@@ -42,7 +42,7 @@ sandbox.globalThis = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(code, sandbox, { filename: 'server.js' });
 
-const { resolveRound, createPlayer, cloneRuleCard } = sandbox.__noiseTest;
+const { resolveRound, createPlayer, cloneRuleCard, matchResult } = sandbox.__noiseTest;
 
 function makeRoom({ ruleType = 'BIG', points = 1, round = 1, aNumber, bNumber, aNoise = null, bNoise = null, carryRule = null }) {
   const playerA = createPlayer('A', 'test-a', 'A');
@@ -171,5 +171,37 @@ results.push(runCase('Mute cancels Hold', {
   assert(room.players.A.usedNumbers.includes(7), 'Mute should cancel Hold and mark number used', room.players.A.usedNumbers);
   assert(room.reveal.raiseBonus === 0, 'Mute case should have no raise bonus', room.reveal);
 }));
+
+const tiebreakRoom = {
+  players: {
+    A: { name: 'A', score: 5, maxStreak: 2 },
+    B: { name: 'B', score: 5, maxStreak: 1 }
+  },
+  reveal: {
+    round: 7,
+    winner: 'B'
+  }
+};
+const tiebreakResult = matchResult(tiebreakRoom);
+assert(tiebreakResult.winner === 'B', 'Final round winner should win tied match', tiebreakResult);
+
+const finalDrawRoom = {
+  players: {
+    A: { name: 'A', score: 5, maxStreak: 2 },
+    B: { name: 'B', score: 5, maxStreak: 1 }
+  },
+  reveal: {
+    round: 7,
+    winner: null
+  }
+};
+const finalDrawResult = matchResult(finalDrawRoom);
+assert(finalDrawResult.winner === null && finalDrawResult.title === 'DRAW', 'Final round draw should keep tied match as draw', finalDrawResult);
+
+results.push({
+  name: 'Final score tiebreaker',
+  winner: tiebreakResult.winner,
+  finalDraw: finalDrawResult.title
+});
 
 console.log(JSON.stringify({ ok: true, results }, null, 2));

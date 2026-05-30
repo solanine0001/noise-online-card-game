@@ -1286,10 +1286,19 @@ function matchResult(room) {
   const scoreB = room.players.B.score;
   const streakSummary = `最高連勝 ${playerLabel(room, 'A')}: ${room.players.A.maxStreak} / ${playerLabel(room, 'B')}: ${room.players.B.maxStreak}`;
   if (scoreA === scoreB) {
+    const finalRoundWinner = room.reveal?.round === TOTAL_ROUNDS ? room.reveal.winner : null;
+    if (finalRoundWinner) {
+      return {
+        winner: finalRoundWinner,
+        title: `${playerLabel(room, finalRoundWinner)} WIN`,
+        detail: `${scoreA} - ${scoreB}。同点のため最終ラウンド勝者が勝利。${streakSummary}`
+      };
+    }
+
     return {
       winner: null,
       title: 'DRAW',
-      detail: `${scoreA} - ${scoreB}。同点のため引き分け。${streakSummary}`
+      detail: `${scoreA} - ${scoreB}。最終ラウンドも引き分け。${streakSummary}`
     };
   }
 
