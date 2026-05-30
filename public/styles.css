@@ -955,6 +955,36 @@ body.modal-open {
   padding-left: 1.35rem;
 }
 
+.rulebook-doc table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 0.92rem;
+}
+
+.rulebook-doc th,
+.rulebook-doc td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+.rulebook-doc th {
+  background: #efe4cf;
+  font-weight: 900;
+}
+
+.rulebook-doc td:last-child,
+.rulebook-doc th:last-child {
+  text-align: right;
+}
+
+.rulebook-doc tr:last-child td {
+  border-bottom: 0;
+}
+
 .hidden {
   display: none;
 }

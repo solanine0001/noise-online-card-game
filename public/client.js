@@ -9,7 +9,7 @@
   const sessionKey = 'noise.sessionId';
   const roomKey = 'noise.roomCode';
   const nameKey = 'noise.name';
-  const noiseOrder = ['Reverse', 'Shift', 'Jam', 'Echo', 'Peek'];
+  const noiseOrder = ['Mute', 'Reverse', 'Shift', 'Raise', 'Sync', 'Hold'];
   const sessionId = getSessionId();
   const queryRoom = new URLSearchParams(window.location.search).get('room');
 
@@ -421,8 +421,8 @@
           <button class="noise-button none ${noneSelected ? 'selected' : ''}" data-noise-id="" ${canPick ? '' : 'disabled'}>使わない</button>
           ${hand.map((card) => `
             <button class="noise-button ${selectedNoiseId === card.id ? 'selected' : ''}"
-              data-noise-id="${escapeHtml(card.id)}" data-noise-type="${escapeHtml(card.type)}" ${canPick && !isNoiseLocked(card) ? '' : 'disabled'}>
-              ${escapeHtml(card.type)}${isNoiseLocked(card) ? '<span>LOCK</span>' : ''}
+              data-noise-id="${escapeHtml(card.id)}" data-noise-type="${escapeHtml(card.type)}" ${canPick ? '' : 'disabled'}>
+              ${escapeHtml(card.type)}
             </button>
           `).join('')}
         </div>
@@ -603,7 +603,7 @@
     }
 
     const selectedCard = state.you.noiseHand?.find((card) => card.id === selectedNoiseId);
-    if (state.phase !== 'noise' || state.choices?.you.noiseLocked || !selectedCard || isNoiseLocked(selectedCard)) {
+    if (state.phase !== 'noise' || state.choices?.you.noiseLocked || !selectedCard) {
       selectedNoiseId = null;
       selectedNoiseType = null;
       shiftDirection = 1;
@@ -620,10 +620,6 @@
     }
 
     resetLocalRoom();
-  }
-
-  function isNoiseLocked(card) {
-    return Number(card.disabledUntilRound || 0) >= Number(state.round || 0);
   }
 
   function openRulebook() {

@@ -50,30 +50,34 @@ const RULES = {
   }
 };
 
-const NOISES = {
+const NOISE_DEFINITIONS = {
   Reverse: {
     label: 'Reverse',
     summary: '現在のルールを反転'
+  },
+  Mute: {
+    label: 'Mute',
+    summary: 'このラウンドのすべてのノイズ効果を無効化'
   },
   Shift: {
     label: 'Shift',
     summary: '自分の数字を±1'
   },
-  Jam: {
-    label: 'Jam',
-    summary: '公開されたノイズ効果を無効化'
+  Raise: {
+    label: 'Raise',
+    summary: 'このラウンドの得点を+2'
   },
-  Echo: {
-    label: 'Echo',
-    summary: '相手が直近で使ったノイズをコピー'
+  Sync: {
+    label: 'Sync',
+    summary: '引き分けなら自分の勝利として扱う'
   },
-  Peek: {
-    label: 'Peek',
-    summary: '相手のノイズ手札を1枚確認して一時封印'
+  Hold: {
+    label: 'Hold',
+    summary: 'このラウンドの数字を使用済みにしない'
   }
 };
 
-const NOISE_TYPES = Object.keys(NOISES);
+const NOISE_TYPES = Object.keys(NOISE_DEFINITIONS);
 const rooms = new Map();
 const socketClients = new Map();
 
@@ -517,11 +521,6 @@ function submitNoise(client, message) {
       sendError(client, 'そのノイズカードは手札にありません。');
       return;
     }
-    if (isNoiseCardLocked(card, room.round)) {
-      sendError(client, 'そのノイズカードはPeekにより使用できません。');
-      return;
-    }
-
     const direction = card.type === 'Shift'
       ? normalizeShiftDirection(room.choices[player.id].number, message.direction)
       : null;
@@ -583,7 +582,6 @@ function startGame(room) {
     player.maxStreak = 0;
     player.usedNumbers = [];
     player.noiseHand = dealNoiseHand();
-    player.noiseHistory = [];
     player.lastNumber = null;
   }
 
@@ -622,16 +620,17 @@ function resolveRound(room) {
   };
   const logs = [];
   const privateNotes = { A: [], B: [] };
-  const directJam = Object.values(noises).some((noise) => noise?.type === 'Jam');
+  const muted = Object.values(noises).some((noise) => noise?.type === 'Mute');
   let reversed = false;
-  let echoJam = false;
-  const peekActors = [];
+  let raiseBonus = 0;
+  const syncPlayers = [];
+  const holdPlayers = new Set();
 
   consumeNoise(playerA, noises.A);
   consumeNoise(playerB, noises.B);
 
-  if (directJam) {
-    logs.push('Jamが発動し、公開されたノイズ効果を無効化しました。');
+  if (muted) {
+    logs.push('Muteが発動し、このラウンドのノイズ効果をすべて無効化しました。');
   } else {
     for (const playerId of ['A', 'B']) {
       if (noises[playerId]?.type === 'Reverse') {
@@ -646,71 +645,60 @@ function resolveRound(room) {
       }
     }
 
-    const echoEffects = [];
     for (const playerId of ['A', 'B']) {
-      if (noises[playerId]?.type !== 'Echo') continue;
-
-      const target = findEchoTarget(opponentId(playerId), room);
-      if (!target) {
-        logs.push(`${playerLabel(room, playerId)}のEchoはコピー対象がなく不発でした。`);
-        continue;
-      }
-
-      logs.push(`${playerLabel(room, playerId)}のEchoが${target.type}をコピーしました。`);
-      echoEffects.push({ playerId, target });
-    }
-
-    if (echoEffects.some((effect) => effect.target.type === 'Jam')) {
-      echoJam = true;
-      logs.push('EchoでコピーされたJamが、Echo以降のノイズ効果を無効化しました。');
-    }
-
-    if (!echoJam) {
-      for (const effect of echoEffects) {
-        if (effect.target.type === 'Reverse') {
-          reversed = !reversed;
-          logs.push(`${playerLabel(room, effect.playerId)}のEcho-Reverseがルールを反転しました。`);
-        }
-      }
-
-      for (const effect of echoEffects) {
-        if (effect.target.type === 'Shift') {
-          applyShift(room, effect.playerId, finalNumbers, effect.target.direction, 'Echo-Shift', logs);
-        }
-      }
-
-      for (const effect of echoEffects) {
-        if (effect.target.type === 'Peek') {
-          peekActors.push({ playerId: effect.playerId, source: 'Echo-Peek' });
-        }
-      }
-
-      for (const playerId of ['A', 'B']) {
-        if (noises[playerId]?.type === 'Peek') {
-          peekActors.push({ playerId, source: 'Peek' });
-        }
-      }
-
-      for (const actor of peekActors) {
-        resolvePeek(room, actor.playerId, actor.source, privateNotes, logs);
+      if (noises[playerId]?.type === 'Raise') {
+        raiseBonus += 2;
+        logs.push(`${playerLabel(room, playerId)}のRaiseでこのラウンドの得点が+2されました。`);
       }
     }
+
+    for (const playerId of ['A', 'B']) {
+      if (noises[playerId]?.type === 'Sync') {
+        syncPlayers.push(playerId);
+        logs.push(`${playerLabel(room, playerId)}のSyncが待機しています。引き分けなら勝利扱いになります。`);
+      }
+    }
+
+    for (const playerId of ['A', 'B']) {
+      if (noises[playerId]?.type === 'Hold') {
+        holdPlayers.add(playerId);
+        logs.push(`${playerLabel(room, playerId)}のHoldで、このラウンドの数字は使用済みになりません。`);
+      }
+    }
+
   }
 
-  const judgement = judgeRound(room.currentRule, reversed, finalNumbers, {
+  let judgement = judgeRound(room.currentRule, reversed, finalNumbers, {
     A: playerA.lastNumber,
     B: playerB.lastNumber
   });
 
+  if (!judgement.winner && syncPlayers.length === 1) {
+    const syncWinner = syncPlayers[0];
+    judgement = {
+      ...judgement,
+      winner: syncWinner,
+      title: `${judgement.title}+SYNC`,
+      detail: `${playerLabel(room, syncWinner)}のSyncにより、引き分けが勝利扱いになりました。`
+    };
+    logs.push(`${playerLabel(room, syncWinner)}のSyncが引き分けを勝利に変えました。`);
+  } else if (!judgement.winner && syncPlayers.length >= 2) {
+    logs.push('両者のSyncが同時に有効なため、引き分けのまま処理します。');
+  }
+
   const carryIn = room.carryRule ? cloneRuleCard(room.carryRule) : null;
   const currentRule = cloneRuleCard(room.currentRule);
-  const potentialPoints = currentRule.points + (carryIn?.points || 0);
+  const baseAwardPoints = currentRule.points + (carryIn?.points || 0);
+  const potentialPoints = baseAwardPoints + raiseBonus;
   let pointsAwarded = 0;
   let carryOut = null;
   let scoreDetail;
   let streakDetail = null;
 
   if (judgement.winner) {
+    if (raiseBonus > 0) {
+      logs.push(`Raiseによる追加${raiseBonus}点をこのラウンドの得点に加算します。`);
+    }
     pointsAwarded = potentialPoints;
     const winner = room.players[judgement.winner];
     const loser = room.players[opponentId(judgement.winner)];
@@ -728,6 +716,9 @@ function resolveRound(room) {
       logs.push(`キャリー中の${carryIn.label} ${carryIn.points}点も獲得対象になりました。`);
     }
   } else {
+    if (raiseBonus > 0) {
+      logs.push(`引き分けのため、Raiseによる追加${raiseBonus}点はキャリーされません。`);
+    }
     room.players.A.currentStreak = 0;
     room.players.B.currentStreak = 0;
     carryOut = currentRule;
@@ -742,15 +733,12 @@ function resolveRound(room) {
 
   for (const playerId of ['A', 'B']) {
     const player = room.players[playerId];
-    player.usedNumbers.push(baseNumbers[playerId]);
-    player.lastNumber = finalNumbers[playerId];
-    if (noises[playerId]) {
-      player.noiseHistory.push({
-        round: room.round,
-        type: noises[playerId].type,
-        direction: noises[playerId].direction
-      });
+    if (holdPlayers.has(playerId)) {
+      logs.push(`${playerLabel(room, playerId)}の${baseNumbers[playerId]}はHoldにより手札に残りました。`);
+    } else if (!player.usedNumbers.includes(baseNumbers[playerId])) {
+      player.usedNumbers.push(baseNumbers[playerId]);
     }
+    player.lastNumber = finalNumbers[playerId];
   }
 
   room.phase = 'reveal';
@@ -768,6 +756,9 @@ function resolveRound(room) {
     carryIn,
     carryOut,
     pointsAwarded,
+    raiseBonus,
+    syncPlayers: [...syncPlayers],
+    holdPlayers: [...holdPlayers],
     scoreDetail,
     streakDetail,
     streaks: {
@@ -871,7 +862,7 @@ function cpuNumberScore(room, playerId, number) {
 
 function chooseCpuNoise(room, playerId) {
   const player = room.players[playerId];
-  const playable = player.noiseHand.filter((card) => !isNoiseCardLocked(card, room.round));
+  const playable = [...player.noiseHand];
   if (playable.length === 0) return null;
 
   const currentNumber = room.choices[playerId].number;
@@ -893,9 +884,13 @@ function chooseCpuNoise(room, playerId) {
 }
 
 function cpuNoiseScore(room, playerId, card) {
-  if (card.type === 'Jam') return 4;
-  if (card.type === 'Peek') return room.players[opponentId(playerId)].noiseHand.length > 0 ? 7 : 0;
-  if (card.type === 'Echo') return findEchoTarget(opponentId(playerId), room) ? 6 : 0;
+  if (card.type === 'Mute') return 5;
+  if (card.type === 'Raise') return room.currentRule?.points >= 2 ? 6 : 4;
+  if (card.type === 'Sync') return 5;
+  if (card.type === 'Hold') {
+    const number = room.choices[playerId].number;
+    return number === 1 || number === MAX_NUMBER ? 7 : 4;
+  }
   if (card.type === 'Reverse') return cpuReverseScore(room, playerId);
   if (card.type === 'Shift') return 7;
   return 3;
@@ -951,26 +946,6 @@ function applyShift(room, playerId, finalNumbers, direction, source, logs) {
   finalNumbers[playerId] = before + normalized;
   const sign = normalized > 0 ? '+1' : '-1';
   logs.push(`${playerLabel(room, playerId)}の${source}で ${before} -> ${finalNumbers[playerId]} (${sign})。`);
-}
-
-function resolvePeek(room, playerId, source, privateNotes, logs) {
-  const targetId = opponentId(playerId);
-  const target = room.players[targetId];
-  const visibleCard = pick(target.noiseHand);
-
-  if (!visibleCard) {
-    privateNotes[playerId].push(`${source}: 相手のノイズ手札は残っていません。`);
-    logs.push(`${playerLabel(room, playerId)}の${source}は、確認できるカードがありませんでした。`);
-    return;
-  }
-
-  visibleCard.disabledUntilRound = Math.max(visibleCard.disabledUntilRound || 0, room.round + 1);
-  privateNotes[playerId].push(`${source}: 相手の手札に ${visibleCard.type} があります。次のラウンド終了まで使用できません。`);
-  logs.push(`${playerLabel(room, playerId)}の${source}が相手のノイズ手札を1枚確認し、一時封印しました。`);
-}
-
-function isNoiseCardLocked(card, round) {
-  return Number(card.disabledUntilRound || 0) >= round;
 }
 
 function judgeRound(rule, reversed, numbers, previousNumbers) {
@@ -1128,16 +1103,6 @@ function consumeNoise(player, noise) {
   }
 }
 
-function findEchoTarget(opponentPlayerId, room) {
-  const history = room.players[opponentPlayerId].noiseHistory;
-  for (let index = history.length - 1; index >= 0; index -= 1) {
-    if (history[index].type !== 'Echo') {
-      return history[index];
-    }
-  }
-  return null;
-}
-
 function normalizeShiftDirection(number, value) {
   if (number === 1) return 1;
   if (number === MAX_NUMBER) return -1;
@@ -1159,8 +1124,7 @@ function createPlayer(id, sessionId, name, options = {}) {
     maxStreak: 0,
     usedNumbers: [],
     lastNumber: null,
-    noiseHand: [],
-    noiseHistory: []
+    noiseHand: []
   };
 }
 
@@ -1261,7 +1225,7 @@ function snapshotFor(room, viewerId) {
     choices: serializeChoices(room, viewerId),
     ready: { ...room.ready },
     reveal: room.reveal ? revealFor(room.reveal, viewerId) : null,
-    allNoises: NOISES,
+    allNoises: NOISE_DEFINITIONS,
     now: Date.now()
   };
 
@@ -1322,19 +1286,10 @@ function matchResult(room) {
   const scoreB = room.players.B.score;
   const streakSummary = `最高連勝 ${playerLabel(room, 'A')}: ${room.players.A.maxStreak} / ${playerLabel(room, 'B')}: ${room.players.B.maxStreak}`;
   if (scoreA === scoreB) {
-    const finalRoundWinner = room.reveal?.round === TOTAL_ROUNDS ? room.reveal.winner : null;
-    if (finalRoundWinner) {
-      return {
-        winner: finalRoundWinner,
-        title: `${playerLabel(room, finalRoundWinner)} WIN`,
-        detail: `${scoreA} - ${scoreB}。同点のため最終ラウンド勝者が勝利。${streakSummary}`
-      };
-    }
-
     return {
       winner: null,
       title: 'DRAW',
-      detail: `${scoreA} - ${scoreB}。最終ラウンドも引き分け。${streakSummary}`
+      detail: `${scoreA} - ${scoreB}。同点のため引き分け。${streakSummary}`
     };
   }
 

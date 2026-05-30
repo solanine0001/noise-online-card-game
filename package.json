@@ -10,6 +10,7 @@
     "smoke": "node scripts/smoke.mjs",
     "smoke:cpu": "node scripts/cpu-smoke.mjs",
     "smoke:carry": "node scripts/carry-smoke.mjs",
+    "smoke:noise": "node scripts/noise-rules-smoke.mjs",
     "visual": "node scripts/visual-check.mjs"
   },
   "engines": {
