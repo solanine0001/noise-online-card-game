@@ -721,18 +721,6 @@ h1 {
   align-items: center;
 }
 
-.auto-next {
-  display: grid;
-  gap: 4px;
-}
-
-.auto-next span {
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 900;
-  text-align: center;
-}
-
 .hand-title {
   display: flex;
   align-items: center;

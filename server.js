@@ -11,7 +11,6 @@ const INDEX_FILE = path.join(PUBLIC_DIR, 'index.html');
 const TOTAL_ROUNDS = 7;
 const MAX_NUMBER = 7;
 const FAR_CENTER = 4;
-const AUTO_ADVANCE_MS = 5000;
 
 const RULE_CARDS = [
   { type: 'BIG', points: 1 },
@@ -335,7 +334,6 @@ function leaveRoom(client) {
   if (!room || !roomCode || !playerId) return;
 
   if (room.mode === 'cpu') {
-    clearAutoAdvance(room);
     rooms.delete(roomCode);
     return;
   }
@@ -368,9 +366,7 @@ function createRoom(client, message) {
     carryRule: null,
     choices: null,
     ready: { A: false, B: false },
-    reveal: null,
-    autoAdvanceTimer: null,
-    autoAdvanceAt: null
+    reveal: null
   };
 
   rooms.set(room.code, room);
@@ -400,9 +396,7 @@ function createCpuRoom(client, message) {
     carryRule: null,
     choices: null,
     ready: { A: false, B: false },
-    reveal: null,
-    autoAdvanceTimer: null,
-    autoAdvanceAt: null
+    reveal: null
   };
 
   rooms.set(room.code, room);
@@ -574,7 +568,6 @@ function readyNext(client) {
 }
 
 function startGame(room) {
-  clearAutoAdvance(room);
   room.status = 'active';
   room.phase = 'number';
   room.round = 0;
@@ -598,7 +591,6 @@ function startGame(room) {
 }
 
 function startRound(room) {
-  clearAutoAdvance(room);
   room.round += 1;
   room.phase = 'number';
   room.currentRule = drawRule(room);
@@ -805,7 +797,6 @@ function resolveRound(room) {
     }
   }
   room.updatedAt = Date.now();
-  scheduleAutoAdvance(room);
 }
 
 function runCpuTurn(room) {
@@ -935,7 +926,6 @@ function chooseCpuShiftDirection(room, playerId, number) {
 }
 
 function endGame(room) {
-  clearAutoAdvance(room);
   room.status = 'ended';
   room.phase = 'ended';
   room.updatedAt = Date.now();
@@ -943,40 +933,11 @@ function endGame(room) {
 
 function advanceFromReveal(room) {
   if (!room || room.phase !== 'reveal') return;
-  clearAutoAdvance(room);
   if (room.round >= TOTAL_ROUNDS) {
     endGame(room);
   } else {
     startRound(room);
   }
-}
-
-function scheduleAutoAdvance(room) {
-  clearAutoAdvance(room);
-  if (!room || room.phase !== 'reveal') return;
-
-  const round = room.round;
-  room.autoAdvanceAt = Date.now() + AUTO_ADVANCE_MS;
-  if (room.reveal) {
-    room.reveal.autoAdvanceAt = room.autoAdvanceAt;
-  }
-
-  room.autoAdvanceTimer = setTimeout(() => {
-    const current = rooms.get(room.code);
-    if (!current || current.phase !== 'reveal' || current.round !== round) return;
-    advanceFromReveal(current);
-    broadcastRoom(current);
-  }, AUTO_ADVANCE_MS);
-  room.autoAdvanceTimer.unref?.();
-}
-
-function clearAutoAdvance(room) {
-  if (!room) return;
-  if (room.autoAdvanceTimer) {
-    clearTimeout(room.autoAdvanceTimer);
-  }
-  room.autoAdvanceTimer = null;
-  room.autoAdvanceAt = null;
 }
 
 function applyShift(room, playerId, finalNumbers, direction, source, logs) {
@@ -1361,10 +1322,19 @@ function matchResult(room) {
   const scoreB = room.players.B.score;
   const streakSummary = `最高連勝 ${playerLabel(room, 'A')}: ${room.players.A.maxStreak} / ${playerLabel(room, 'B')}: ${room.players.B.maxStreak}`;
   if (scoreA === scoreB) {
+    const finalRoundWinner = room.reveal?.round === TOTAL_ROUNDS ? room.reveal.winner : null;
+    if (finalRoundWinner) {
+      return {
+        winner: finalRoundWinner,
+        title: `${playerLabel(room, finalRoundWinner)} WIN`,
+        detail: `${scoreA} - ${scoreB}。同点のため最終ラウンド勝者が勝利。${streakSummary}`
+      };
+    }
+
     return {
       winner: null,
       title: 'DRAW',
-      detail: `${scoreA} - ${scoreB}。${streakSummary}`
+      detail: `${scoreA} - ${scoreB}。最終ラウンドも引き分け。${streakSummary}`
     };
   }
 
@@ -1503,7 +1473,6 @@ function cleanupRooms() {
     const inactiveFor = now - room.updatedAt;
     const bothGone = !room.players.A?.connected && !room.players.B?.connected;
     if (bothGone && inactiveFor > 3 * 60 * 60 * 1000) {
-      clearAutoAdvance(room);
       rooms.delete(code);
     }
   }

@@ -65,8 +65,8 @@ await client.waitFor((state) => state?.phase === 'noise');
 client.send({ type: 'submitNoise', cardId: null });
 await client.waitFor((state) => state?.phase === 'reveal');
 
-const autoAdvanceAt = client.state.reveal.autoAdvanceAt;
-await client.waitFor((state) => state?.round === 2 && state?.phase === 'number', 8000);
+client.send({ type: 'readyNext' });
+await client.waitFor((state) => state?.round === 2 && state?.phase === 'number');
 
 console.log(JSON.stringify({
   roomCode: client.state.roomCode,
@@ -74,7 +74,6 @@ console.log(JSON.stringify({
   isCpu: client.state.opponent.isCpu,
   round: client.state.round,
   phase: client.state.phase,
-  autoAdvanceScheduled: Boolean(autoAdvanceAt),
   score: `${client.state.you.score}-${client.state.opponent.score}`
 }, null, 2));
 
